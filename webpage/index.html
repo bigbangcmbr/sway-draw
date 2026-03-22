@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sway-Draw | Native Wayland Screen Annotation</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <header>
+        <div class="container">
+            <div class="logo">Sway-Draw</div>
+            <nav>
+                <a href="#features">Features</a>
+                <a href="#shortcuts">Shortcuts</a>
+                <a href="#install">Install</a>
+                <a href="https://github.com/vedanshbodkhe21/sway-draw" class="btn-github">GitHub</a>
+            </nav>
+        </div>
+    </header>
+
+    <main>
+        <section class="hero">
+            <div class="container">
+                <div class="hero-content">
+                    <h1>Native Wayland <br><span class="gradient-text">Screen Annotation</span></h1>
+                    <p class="tagline">Lightweight, performant, and perfectly integrated into your Wayland compositor.</p>
+                    <div class="hero-actions">
+                        <a href="#install" class="btn btn-primary">Get Started</a>
+                        <a href="#features" class="btn btn-secondary">Learn More</a>
+                    </div>
+                </div>
+                <div class="hero-visual">
+                    <div class="drawing-box">
+                        <canvas id="hero-canvas"></canvas>
+                        <div class="overlay-hint">Try drawing here!</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section id="features" class="features">
+            <div class="container">
+                <h2 class="section-title">Why Sway-Draw?</h2>
+                <div class="feature-grid">
+                    <div class="feature-card">
+                        <div class="feature-icon">⚡</div>
+                        <h3>Blazing Performance</h3>
+                        <p>Partial damage tracking ensures only modified areas are redrawn, even on 4K displays. Minimal CPU usage, maximum responsiveness.</p>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon">🛡️</div>
+                        <h3>Native Wayland</h3>
+                        <p>Built with <code>wlr-layer-shell</code> and <code>smithay-client-toolkit</code> for a seamless integration with Sway, Hyprland, and other compositors.</p>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon">🖌️</div>
+                        <h3>Smooth as Ink</h3>
+                        <p>Multi-pass Laplacian smoothing combined with Quadratic Bézier curves for professional-looking freehand annotations.</p>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon">🪶</div>
+                        <h3>Ultra-Lightweight</h3>
+                        <p>Written in Rust with software rendering via <code>tiny-skia</code>. No heavy UI toolkits or GPU dependencies required.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section id="shortcuts" class="shortcuts">
+            <div class="container">
+                <h2 class="section-title">Control at Your Fingertips</h2>
+                <div class="shortcut-list">
+                    <div class="shortcut-item">
+                        <span class="key">Ctrl</span> + <span class="key">1</span>
+                        <span class="action">Freehand Tool</span>
+                    </div>
+                    <div class="shortcut-item">
+                        <span class="key">Ctrl</span> + <span class="key">2</span>
+                        <span class="action">Rectangle Tool</span>
+                    </div>
+                    <div class="shortcut-item">
+                        <span class="key">Ctrl</span> + <span class="key">3</span>
+                        <span class="action">Line & Arrow</span>
+                    </div>
+                    <div class="shortcut-item">
+                        <span class="key">Ctrl</span> + <span class="key">4</span>
+                        <span class="action">Toggle Smoothing</span>
+                    </div>
+                    <div class="shortcut-item">
+                        <span class="key">Ctrl</span> + <span class="key">Z</span>
+                        <span class="action">Undo last stroke</span>
+                    </div>
+                    <div class="shortcut-item">
+                        <span class="key">Ctrl</span> + <span class="key">D</span>
+                        <span class="action">Clear Screen</span>
+                    </div>
+                    <div class="shortcut-item">
+                        <span class="key">Esc</span>
+                        <span class="action">Exit Application</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section id="install" class="install">
+            <div class="container">
+                <h2 class="section-title">Quick Installation</h2>
+                <div class="terminal-window">
+                    <div class="terminal-header">
+                        <div class="terminal-controls">
+                            <span class="dot red"></span>
+                            <span class="dot yellow"></span>
+                            <span class="dot green"></span>
+                        </div>
+                        <div class="terminal-title">bash</div>
+                        <button id="copy-btn" class="copy-btn" title="Copy to clipboard">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                        </button>
+                    </div>
+                    <div class="code-block">
+                        <pre id="install-code"><code><span class="line"><span class="cmd">git</span> clone <span class="url">https://github.com/vedanshbodkhe21/sway-draw.git</span></span>
+<span class="line"><span class="cmd">cd</span> sway-draw</span>
+<span class="line"><span class="cmd">cargo</span> run <span class="opt">--release</span></span></code></pre>
+                    </div>
+                </div>
+                <p class="note">Requires a Wayland compositor that supports <code>wlr-layer-shell</code>.</p>
+            </div>
+        </section>
+    </main>
+
+    <footer>
+        <div class="container">
+            <p>&copy; 2026 Sway-Draw Project. Built with Rust.</p>
+        </div>
+    </footer>
+
+    <script src="script.js"></script>
+</body>
+</html>
