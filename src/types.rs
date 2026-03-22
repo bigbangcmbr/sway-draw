@@ -3,13 +3,19 @@ use resvg::usvg;
 const SVG_FREEHAND: &str = r#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/><path d="M2 2l8 8"/><path d="M2 22l5-5"/></svg>"#;
 const SVG_RECTANGLE: &str = r#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/></svg>"#;
 const SVG_ARROW: &str = r#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>"#;
+const SVG_SMOOTH: &str = r#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3V5"/><path d="M5 8H3"/><path d="M21 8H19"/><path d="M18 15L16 13L14 15"/><path d="M16 13V21"/><path d="M12 21H16"/><path d="M7 21H11"/><path d="M9 21V13L7 15"/><path d="M2 13L4 15L6 13"/><path d="M18 13L20 15L22 13"/></svg>"#;
 const SVG_UNDO: &str = r#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7v6h6"/><path d="M21 17a9 9 0 00-9-9 9 9 0 00-6 2.3L3 13"/></svg>"#;
+
+const SVG_SMOOTH_0: &str = r#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h18"/><path d="M12 3v18" opacity="0.1"/></svg>"#;
+const SVG_SMOOTH_1: &str = r#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 16c3-2 6-2 9 0s6 2 9 0"/></svg>"#;
+const SVG_SMOOTH_2: &str = r#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12c6-8 12 8 18 0"/></svg>"#;
 
 fn get_tool_svg(tool: Tool) -> &'static str {
     match tool {
         Tool::Freehand => SVG_FREEHAND,
         Tool::Rectangle => SVG_RECTANGLE,
         Tool::Arrow => SVG_ARROW,
+        Tool::Smooth => SVG_SMOOTH,
         Tool::Undo => SVG_UNDO,
     }
 }
@@ -75,6 +81,7 @@ pub enum Tool {
     Rectangle,
     Arrow,
     Freehand,
+    Smooth,
     Undo,
 }
 
@@ -84,6 +91,7 @@ pub enum Shape {
         points: Vec<Point>,
         color: tiny_skia::Color,
         thickness: f32,
+        smoothness: u32,
     },
     Rectangle {
         start: Point,
@@ -173,6 +181,7 @@ pub struct Button {
 pub struct Toolbar {
     pub rect: Rect,
     pub buttons: Vec<Button>,
+    pub smooth_level_icons: Vec<usvg::Tree>,
 }
 
 impl Toolbar {
@@ -181,10 +190,16 @@ impl Toolbar {
         let button_size = 40;
         let padding = 10;
         let x = 20; // Positioned 20px from left
-        let y = (screen_height as i32 - (4 * (button_size + padding))) / 2; // Centered vertically
+        let y = (screen_height as i32 - (5 * (button_size + padding))) / 2; // Centered vertically, 5 buttons now
 
         let mut buttons = Vec::new();
-        let tools = [Tool::Freehand, Tool::Rectangle, Tool::Arrow, Tool::Undo];
+        let tools = [
+            Tool::Freehand,
+            Tool::Rectangle,
+            Tool::Arrow,
+            Tool::Smooth,
+            Tool::Undo,
+        ];
 
         let mut opt = usvg::Options::default();
         opt.font_family = "sans-serif".to_string();
@@ -205,6 +220,11 @@ impl Toolbar {
             });
         }
 
+        let mut smooth_level_icons = Vec::new();
+        for svg_str in [SVG_SMOOTH_0, SVG_SMOOTH_1, SVG_SMOOTH_2] {
+            smooth_level_icons.push(usvg::Tree::from_str(svg_str, &opt).unwrap());
+        }
+
         Toolbar {
             rect: Rect {
                 x,
@@ -213,6 +233,7 @@ impl Toolbar {
                 h: (buttons.len() as i32 * (button_size + padding) + padding) as u32,
             },
             buttons,
+            smooth_level_icons,
         }
     }
 }

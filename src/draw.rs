@@ -1,6 +1,44 @@
-use crate::types::{Shape, Tool, Toolbar};
+use crate::types::{Point, Shape, Tool, Toolbar};
 
-pub fn render_toolbar(pixmap: &mut tiny_skia::PixmapMut, toolbar: &Toolbar, current_tool: Tool) {
+fn smooth_points(points: &[Point], level: u32) -> Vec<Point> {
+    if level == 0 || points.len() < 3 {
+        return points.to_vec();
+    }
+    
+    // Level 1: 3 iterations, Level 2: 8 iterations for extra smoothness
+    let iterations = if level == 1 { 3 } else { 8 };
+    
+    let mut current = points.to_vec();
+    for _ in 0..iterations {
+        let mut next = Vec::with_capacity(current.len());
+        next.push(current[0].clone());
+        for i in 1..current.len() - 1 {
+            let p_prev = &current[i - 1];
+            let p_curr = &current[i];
+            let p_next = &current[i + 1];
+            
+            // Stronger smoothing kernel for level 2
+            let weight = if level == 1 { 2.0 } else { 1.0 }; 
+            let total_weight = 2.0 + weight;
+            
+            next.push(Point {
+                x: (p_prev.x + p_curr.x * weight + p_next.x) / total_weight,
+                y: (p_prev.y + p_curr.y * weight + p_next.y) / total_weight,
+            });
+        }
+        next.push(current[current.len() - 1].clone());
+        current = next;
+    }
+    current
+}
+
+pub fn render_toolbar(
+    pixmap: &mut tiny_skia::PixmapMut,
+    toolbar: &Toolbar,
+    current_tool: Tool,
+    smoothness: u32,
+    smooth_menu_open: bool,
+) {
     let mut paint = tiny_skia::Paint::default();
     paint.set_color(tiny_skia::Color::from_rgba8(40, 44, 52, 230)); // Dark background with alpha
 
@@ -16,9 +54,19 @@ pub fn render_toolbar(pixmap: &mut tiny_skia::PixmapMut, toolbar: &Toolbar, curr
 
     for button in &toolbar.buttons {
         let mut button_paint = tiny_skia::Paint::default();
-        let is_active = button.icon == current_tool;
+        let is_active = if button.icon == Tool::Smooth {
+            smoothness > 0
+        } else {
+            button.icon == current_tool
+        };
+
         if is_active {
-            button_paint.set_color(tiny_skia::Color::from_rgba8(80, 80, 200, 255)); // Highlighted
+            let alpha = if button.icon == Tool::Smooth {
+                if smoothness == 1 { 150 } else { 255 }
+            } else {
+                255
+            };
+            button_paint.set_color(tiny_skia::Color::from_rgba8(80, 80, 200, alpha));
         } else {
             button_paint.set_color(tiny_skia::Color::from_rgba8(60, 64, 72, 255));
         }
@@ -49,6 +97,62 @@ pub fn render_toolbar(pixmap: &mut tiny_skia::PixmapMut, toolbar: &Toolbar, curr
         .pre_scale(icon_size / 24.0, icon_size / 24.0); // SVGs are 24x24
 
         resvg::render(&button.svg_tree, ts, pixmap);
+
+        // Show dots for Smooth levels (1 dot for Low, 2 dots for High)
+        if button.icon == Tool::Smooth && smoothness > 0 {
+            let mut dot_paint = tiny_skia::Paint::default();
+            dot_paint.set_color(tiny_skia::Color::WHITE);
+            for i in 0..smoothness {
+                let dot_rect = tiny_skia::Rect::from_xywh(
+                    button.rect.x as f32 + 2.0,
+                    button.rect.y as f32 + button.rect.h as f32 - 4.0 - (i as f32 * 4.0),
+                    2.0,
+                    2.0,
+                )
+                .unwrap();
+                pixmap.fill_rect(dot_rect, &dot_paint, tiny_skia::Transform::identity(), None);
+            }
+        }
+
+        // Render Flyout
+        if button.icon == Tool::Smooth && smooth_menu_open {
+            let flyout_x = toolbar.rect.x as f32 + toolbar.rect.w as f32 + 10.0;
+            let flyout_y = button.rect.y as f32;
+            let flyout_w = 120.0; // 40px * 3 levels
+            let flyout_h = 40.0;
+
+            let mut flyout_paint = tiny_skia::Paint::default();
+            flyout_paint.set_color(tiny_skia::Color::from_rgba8(40, 44, 52, 230));
+
+            let flyout_rect = tiny_skia::Rect::from_xywh(flyout_x, flyout_y, flyout_w, flyout_h).unwrap();
+            pixmap.fill_rect(flyout_rect, &flyout_paint, tiny_skia::Transform::identity(), None);
+
+            // Level Buttons (0: None, 1: Low, 2: High)
+            for level in 0..3 {
+                let level_x = flyout_x + (level as f32 * 40.0);
+                let is_level_active = level == smoothness;
+
+                let mut level_paint = tiny_skia::Paint::default();
+                if is_level_active {
+                    level_paint.set_color(tiny_skia::Color::from_rgba8(80, 80, 200, 255));
+                } else {
+                    level_paint.set_color(tiny_skia::Color::from_rgba8(70, 74, 82, 255));
+                }
+
+                let level_rect = tiny_skia::Rect::from_xywh(level_x + 2.0, flyout_y + 2.0, 36.0, 36.0).unwrap();
+                pixmap.fill_rect(level_rect, &level_paint, tiny_skia::Transform::identity(), None);
+
+                // Render level SVG icon
+                if let Some(tree) = toolbar.smooth_level_icons.get(level as usize) {
+                    // Scale to fit 20px icon in 36px button with padding
+                    let scale = 20.0 / 24.0;
+                    let ts = tiny_skia::Transform::from_translate(level_x + 8.0, flyout_y + 8.0)
+                        .pre_scale(scale, scale);
+                    
+                    resvg::render(tree, ts, pixmap);
+                }
+            }
+        }
     }
 }
 
@@ -59,13 +163,34 @@ pub fn render_shape(pixmap: &mut tiny_skia::PixmapMut, shape: &Shape) {
             points,
             color,
             thickness,
+            smoothness,
         } => {
             if points.len() < 2 {
                 return;
             }
-            pb.move_to(points[0].x, points[0].y);
-            for p in &points[1..] {
-                pb.line_to(p.x, p.y);
+            if *smoothness > 0 && points.len() >= 3 {
+                // Apply iterative smoothing filter first
+                let points = smooth_points(points, *smoothness);
+
+                pb.move_to(points[0].x, points[0].y);
+
+                for i in 1..points.len() - 1 {
+                    let p1 = &points[i];
+                    let p2 = &points[i + 1];
+
+                    let mid_x = (p1.x + p2.x) / 2.0;
+                    let mid_y = (p1.y + p2.y) / 2.0;
+
+                    pb.quad_to(p1.x, p1.y, mid_x, mid_y);
+                }
+
+                let last = &points[points.len() - 1];
+                pb.line_to(last.x, last.y);
+            } else {
+                pb.move_to(points[0].x, points[0].y);
+                for p in &points[1..] {
+                    pb.line_to(p.x, p.y);
+                }
             }
             (*color, *thickness)
         }

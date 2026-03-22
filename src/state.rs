@@ -42,6 +42,8 @@ pub struct AppState {
 
     pub toolbar: Toolbar,
     pub current_tool: Tool,
+    pub smoothness: u32,
+    pub smooth_menu_open: bool,
     pub active_shape: Option<Shape>,
     pub completed_shapes: Vec<Shape>,
 
@@ -266,7 +268,11 @@ impl KeyboardHandler for AppState {
         } else if is_ctrl && event.keysym == Keysym::_3 {
             self.current_tool = Tool::Arrow;
             self.mark_toolbar_dirty();
-        } else if is_ctrl && event.keysym == Keysym::z {
+        } else if is_ctrl && event.keysym == Keysym::_4 {
+            self.smoothness = (self.smoothness + 1) % 3;
+            self.mark_toolbar_dirty();
+        }
+ else if is_ctrl && event.keysym == Keysym::z {
             self.undo();
         }
 
@@ -367,27 +373,80 @@ impl PointerHandler for AppState {
                             y: event.position.1 as f32,
                         };
 
-                        // Check if we clicked on the toolbar
-                        let mut tool_changed = false;
+                        // 1. Check if we clicked in the flyout menu (if open)
+                        if self.smooth_menu_open {
+                            let flyout_x = self.toolbar.rect.x + self.toolbar.rect.w as i32 + 10;
+                            let mut smooth_y = self.toolbar.rect.y;
+                            for b in &self.toolbar.buttons {
+                                if b.icon == Tool::Smooth {
+                                    smooth_y = b.rect.y;
+                                    break;
+                                }
+                            }
+
+                            let flyout_rect = Rect {
+                                x: flyout_x,
+                                y: smooth_y,
+                                w: 120, // 3 levels * 40px
+                                h: 40,
+                            };
+
+                            if flyout_rect.contains(current_point.x, current_point.y) {
+                                let local_x = current_point.x - flyout_x as f32;
+                                let level = (local_x / 40.0).floor() as u32;
+                                self.smoothness = level.min(2);
+                                self.smooth_menu_open = false;
+                                self.mark_toolbar_dirty();
+                                if !self.frame_pending {
+                                    self.draw(qh);
+                                }
+                                return;
+                            }
+                        }
+
+                        // 2. Check if we clicked on the toolbar
+                        let mut ui_clicked = false;
+                        let mut smooth_button_clicked = false;
                         for button in &self.toolbar.buttons {
                             if button.rect.contains(current_point.x, current_point.y) {
+                                ui_clicked = true;
                                 if button.icon == Tool::Undo {
                                     self.undo();
+                                } else if button.icon == Tool::Smooth {
+                                    smooth_button_clicked = true;
                                 } else if self.current_tool != button.icon {
                                     self.current_tool = button.icon;
-                                    tool_changed = true;
                                 }
                                 break;
                             }
                         }
 
-                        if tool_changed {
-                            self.pending_damage = match &self.pending_damage {
-                                Some(d) => Some(d.union(&self.toolbar.rect)),
-                                None => Some(self.toolbar.rect.clone()),
-                            };
-                            needs_redraw = true;
-                        } else if !self.toolbar.rect.contains(current_point.x, current_point.y) {
+                        if smooth_button_clicked {
+                            self.smooth_menu_open = !self.smooth_menu_open;
+                            self.mark_toolbar_dirty();
+                            if !self.frame_pending {
+                                self.draw(qh);
+                            }
+                            return;
+                        }
+
+                        if ui_clicked {
+                            self.smooth_menu_open = false;
+                            self.mark_toolbar_dirty();
+                            if !self.frame_pending {
+                                self.draw(qh);
+                            }
+                            return;
+                        }
+
+                        // If menu was open but we clicked elsewhere, close it and continue (might start drawing)
+                        if self.smooth_menu_open {
+                            self.smooth_menu_open = false;
+                            self.mark_toolbar_dirty();
+                            // Don't return, we might want to start drawing a stroke
+                        }
+
+                        if !self.toolbar.rect.contains(current_point.x, current_point.y) {
                             // Only start drawing if NOT on toolbar
                             let shape = match self.current_tool {
                                 Tool::Rectangle => Shape::Rectangle {
@@ -406,8 +465,10 @@ impl PointerHandler for AppState {
                                     points: vec![current_point],
                                     color: tiny_skia::Color::from_rgba8(255, 0, 0, 255),
                                     thickness: 4.0,
+                                    smoothness: self.smoothness,
                                 },
                                 Tool::Undo => unreachable!("Undo is an action, not a drawable tool"),
+                                Tool::Smooth => unreachable!("Smooth is a toggle action"),
                             };
                             self.active_shape = Some(shape);
                             needs_redraw = true;
@@ -451,9 +512,14 @@ impl ShmHandler for AppState {
 
 impl AppState {
     pub fn mark_toolbar_dirty(&mut self) {
+        let mut area = self.toolbar.rect.clone();
+        // Always include the flyout area in damage calculations to ensure it is cleared
+        // even if it just closed this frame.
+        area.w += 130; // 120px flyout + 10px gap
+        
         self.pending_damage = match &self.pending_damage {
-            Some(d) => Some(d.union(&self.toolbar.rect)),
-            None => Some(self.toolbar.rect.clone()),
+            Some(d) => Some(d.union(&area)),
+            None => Some(area),
         };
         self.needs_redraw = true;
     }
@@ -518,9 +584,13 @@ impl AppState {
         // Always ensure toolbar is redrawn if it's in the dirty area, or force it
         // For simplicity, let's just union the toolbar rect with dirty rect if anything changed
         if dirty_rect.is_some() {
+            let mut ui_area = self.toolbar.rect.clone();
+            if self.smooth_menu_open {
+                ui_area.w += 160;
+            }
             dirty_rect = match dirty_rect {
-                Some(d) => Some(d.union(&self.toolbar.rect)),
-                None => Some(self.toolbar.rect.clone()),
+                Some(d) => Some(d.union(&ui_area)),
+                None => Some(ui_area),
             };
         }
 
@@ -562,7 +632,13 @@ impl AppState {
                 }
 
                 // Render the toolbar on top of EVERYTHING
-                render_toolbar(&mut pixmap, &self.toolbar, self.current_tool);
+                render_toolbar(
+                    &mut pixmap,
+                    &self.toolbar,
+                    self.current_tool,
+                    self.smoothness,
+                    self.smooth_menu_open,
+                );
             }
 
             // 4. Convert RGBA to BGRA only in the dirty region

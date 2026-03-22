@@ -77,6 +77,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         toolbar: types::Toolbar::new(1920, 1080),
         current_tool: types::Tool::Freehand,
+        smoothness: 1,
+        smooth_menu_open: false,
         active_shape: None,
         completed_shapes: Vec::new(),
         completed_canvas: tiny_skia::Pixmap::new(1920, 1080).unwrap(),
