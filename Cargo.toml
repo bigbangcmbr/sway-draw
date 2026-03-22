@@ -8,7 +8,7 @@ repository = "https://github.com/vedanshbodkhe21/sway-draw"
 homepage = "https://github.com/vedanshbodkhe21/sway-draw"
 readme = "README.md"
 keywords = ["wayland", "sway", "annotation", "drawing", "overlay"]
-categories = ["command-line-utilities", "multimedia::graphics"]
+categories = ["command-line-utilities", "multimedia", "graphics"]
 
 [dependencies]
 env_logger = "0.11.9"
