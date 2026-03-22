@@ -20,8 +20,8 @@ use wayland_client::{
     Connection, QueueHandle,
 };
 
-use crate::draw::render_shape;
-use crate::types::{Point, Rect, Shape, Tool};
+use crate::draw::{render_shape, render_toolbar};
+use crate::types::{Point, Rect, Shape, Tool, Toolbar};
 
 pub struct AppState {
     pub registry_state: RegistryState,
@@ -40,6 +40,7 @@ pub struct AppState {
     pub modifiers: Modifiers,
     pub pointer: Option<wl_pointer::WlPointer>,
 
+    pub toolbar: Toolbar,
     pub current_tool: Tool,
     pub active_shape: Option<Shape>,
 
@@ -152,6 +153,7 @@ impl LayerShellHandler for AppState {
             self.height = height;
             // Re-create the completed canvas if size changes
             self.completed_canvas = tiny_skia::Pixmap::new(self.width, self.height).unwrap();
+            self.toolbar = Toolbar::new(self.width, self.height);
             self.pending_damage = Some(Rect {
                 x: 0,
                 y: 0,
@@ -255,11 +257,14 @@ impl KeyboardHandler for AppState {
         if event.keysym == Keysym::Escape {
             self.exit = true;
         } else if is_ctrl && event.keysym == Keysym::_1 {
-            self.current_tool = Tool::Rectangle;
-        } else if is_ctrl && event.keysym == Keysym::_2 {
-            self.current_tool = Tool::Arrow;
-        } else if is_ctrl && event.keysym == Keysym::_3 {
             self.current_tool = Tool::Freehand;
+            self.mark_toolbar_dirty();
+        } else if is_ctrl && event.keysym == Keysym::_2 {
+            self.current_tool = Tool::Rectangle;
+            self.mark_toolbar_dirty();
+        } else if is_ctrl && event.keysym == Keysym::_3 {
+            self.current_tool = Tool::Arrow;
+            self.mark_toolbar_dirty();
         }
     }
 
@@ -349,31 +354,53 @@ impl PointerHandler for AppState {
                 }
                 Press { button, .. } => {
                     if button == 272 {
-                        let start_point = Point {
+                        let current_point = Point {
                             x: event.position.0 as f32,
                             y: event.position.1 as f32,
                         };
-                        let shape = match self.current_tool {
-                            Tool::Rectangle => Shape::Rectangle {
-                                start: start_point.clone(),
-                                end: start_point,
-                                color: tiny_skia::Color::from_rgba8(255, 0, 0, 255),
-                                thickness: 4.0,
-                            },
-                            Tool::Arrow => Shape::Arrow {
-                                start: start_point.clone(),
-                                end: start_point,
-                                color: tiny_skia::Color::from_rgba8(255, 0, 0, 255),
-                                thickness: 4.0,
-                            },
-                            Tool::Freehand => Shape::Freehand {
-                                points: vec![start_point],
-                                color: tiny_skia::Color::from_rgba8(255, 0, 0, 255),
-                                thickness: 4.0,
-                            },
-                        };
-                        self.active_shape = Some(shape);
-                        needs_redraw = true;
+
+                        // Check if we clicked on the toolbar
+                        let mut tool_changed = false;
+                        for button in &self.toolbar.buttons {
+                            if button.rect.contains(current_point.x, current_point.y) {
+                                if self.current_tool != button.icon {
+                                    self.current_tool = button.icon;
+                                    tool_changed = true;
+                                }
+                                break;
+                            }
+                        }
+
+                        if tool_changed {
+                            self.pending_damage = match &self.pending_damage {
+                                Some(d) => Some(d.union(&self.toolbar.rect)),
+                                None => Some(self.toolbar.rect.clone()),
+                            };
+                            needs_redraw = true;
+                        } else if !self.toolbar.rect.contains(current_point.x, current_point.y) {
+                            // Only start drawing if NOT on toolbar
+                            let shape = match self.current_tool {
+                                Tool::Rectangle => Shape::Rectangle {
+                                    start: current_point.clone(),
+                                    end: current_point,
+                                    color: tiny_skia::Color::from_rgba8(255, 0, 0, 255),
+                                    thickness: 4.0,
+                                },
+                                Tool::Arrow => Shape::Arrow {
+                                    start: current_point.clone(),
+                                    end: current_point,
+                                    color: tiny_skia::Color::from_rgba8(255, 0, 0, 255),
+                                    thickness: 4.0,
+                                },
+                                Tool::Freehand => Shape::Freehand {
+                                    points: vec![current_point],
+                                    color: tiny_skia::Color::from_rgba8(255, 0, 0, 255),
+                                    thickness: 4.0,
+                                },
+                            };
+                            self.active_shape = Some(shape);
+                            needs_redraw = true;
+                        }
                     }
                 }
                 Release { button, .. } => {
@@ -411,6 +438,14 @@ impl ShmHandler for AppState {
 }
 
 impl AppState {
+    pub fn mark_toolbar_dirty(&mut self) {
+        self.pending_damage = match &self.pending_damage {
+            Some(d) => Some(d.union(&self.toolbar.rect)),
+            None => Some(self.toolbar.rect.clone()),
+        };
+        self.needs_redraw = true;
+    }
+
     pub fn draw(&mut self, qh: &QueueHandle<Self>) {
         let width = self.width;
         let height = self.height;
@@ -443,6 +478,15 @@ impl AppState {
             dirty_rect = match dirty_rect {
                 Some(d) => Some(d.union(r)),
                 None => Some(r.clone()),
+            };
+        }
+
+        // Always ensure toolbar is redrawn if it's in the dirty area, or force it
+        // For simplicity, let's just union the toolbar rect with dirty rect if anything changed
+        if dirty_rect.is_some() {
+            dirty_rect = match dirty_rect {
+                Some(d) => Some(d.union(&self.toolbar.rect)),
+                None => Some(self.toolbar.rect.clone()),
             };
         }
 
@@ -482,6 +526,9 @@ impl AppState {
                 if let Some(active) = &self.active_shape {
                     render_shape(&mut pixmap, active);
                 }
+
+                // Render the toolbar on top of EVERYTHING
+                render_toolbar(&mut pixmap, &self.toolbar, self.current_tool);
             }
 
             // 4. Convert RGBA to BGRA only in the dirty region

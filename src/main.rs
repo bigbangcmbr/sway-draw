@@ -75,7 +75,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         modifiers: smithay_client_toolkit::seat::keyboard::Modifiers::default(),
         pointer: None,
 
-        current_tool: types::Tool::Rectangle,
+        toolbar: types::Toolbar::new(1920, 1080),
+        current_tool: types::Tool::Freehand,
         active_shape: None,
         completed_canvas: tiny_skia::Pixmap::new(1920, 1080).unwrap(),
         last_active_stroke_rect: None,

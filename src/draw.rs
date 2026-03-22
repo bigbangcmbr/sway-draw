@@ -1,4 +1,56 @@
-use crate::types::Shape;
+use crate::types::{Shape, Tool, Toolbar};
+
+pub fn render_toolbar(pixmap: &mut tiny_skia::PixmapMut, toolbar: &Toolbar, current_tool: Tool) {
+    let mut paint = tiny_skia::Paint::default();
+    paint.set_color(tiny_skia::Color::from_rgba8(40, 44, 52, 230)); // Dark background with alpha
+
+    let rect = tiny_skia::Rect::from_xywh(
+        toolbar.rect.x as f32,
+        toolbar.rect.y as f32,
+        toolbar.rect.w as f32,
+        toolbar.rect.h as f32,
+    )
+    .unwrap();
+
+    pixmap.fill_rect(rect, &paint, tiny_skia::Transform::identity(), None);
+
+    for button in &toolbar.buttons {
+        let mut button_paint = tiny_skia::Paint::default();
+        let is_active = button.icon == current_tool;
+        if is_active {
+            button_paint.set_color(tiny_skia::Color::from_rgba8(80, 80, 200, 255)); // Highlighted
+        } else {
+            button_paint.set_color(tiny_skia::Color::from_rgba8(60, 64, 72, 255));
+        }
+
+        let button_rect = tiny_skia::Rect::from_xywh(
+            button.rect.x as f32,
+            button.rect.y as f32,
+            button.rect.w as f32,
+            button.rect.h as f32,
+        )
+        .unwrap();
+
+        pixmap.fill_rect(
+            button_rect,
+            &button_paint,
+            tiny_skia::Transform::identity(),
+            None,
+        );
+
+        // Render SVG icon
+        let icon_padding = 8.0;
+        let icon_size = button.rect.w as f32 - (icon_padding * 2.0);
+
+        let ts = tiny_skia::Transform::from_translate(
+            button.rect.x as f32 + icon_padding,
+            button.rect.y as f32 + icon_padding,
+        )
+        .pre_scale(icon_size / 24.0, icon_size / 24.0); // SVGs are 24x24
+
+        resvg::render(&button.svg_tree, ts, pixmap);
+    }
+}
 
 pub fn render_shape(pixmap: &mut tiny_skia::PixmapMut, shape: &Shape) {
     let mut pb = tiny_skia::PathBuilder::new();
