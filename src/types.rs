@@ -3,14 +3,17 @@ use resvg::usvg;
 const SVG_FREEHAND: &str = r#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/><path d="M2 2l8 8"/><path d="M2 22l5-5"/></svg>"#;
 const SVG_RECTANGLE: &str = r#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/></svg>"#;
 const SVG_ARROW: &str = r#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>"#;
+const SVG_UNDO: &str = r#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7v6h6"/><path d="M21 17a9 9 0 00-9-9 9 9 0 00-6 2.3L3 13"/></svg>"#;
 
 fn get_tool_svg(tool: Tool) -> &'static str {
     match tool {
         Tool::Freehand => SVG_FREEHAND,
         Tool::Rectangle => SVG_RECTANGLE,
         Tool::Arrow => SVG_ARROW,
+        Tool::Undo => SVG_UNDO,
     }
 }
+
 
 #[derive(Clone, Debug)]
 pub struct Point {
@@ -72,6 +75,7 @@ pub enum Tool {
     Rectangle,
     Arrow,
     Freehand,
+    Undo,
 }
 
 #[derive(Clone, Debug)]
@@ -180,7 +184,7 @@ impl Toolbar {
         let y = (screen_height as i32 - (4 * (button_size + padding))) / 2; // Centered vertically
 
         let mut buttons = Vec::new();
-        let tools = [Tool::Freehand, Tool::Rectangle, Tool::Arrow];
+        let tools = [Tool::Freehand, Tool::Rectangle, Tool::Arrow, Tool::Undo];
 
         let mut opt = usvg::Options::default();
         opt.font_family = "sans-serif".to_string();
