@@ -249,7 +249,7 @@ impl KeyboardHandler for AppState {
     fn press_key(
         &mut self,
         _conn: &Connection,
-        _qh: &QueueHandle<Self>,
+        qh: &QueueHandle<Self>,
         _: &wl_keyboard::WlKeyboard,
         _: u32,
         event: KeyEvent,
@@ -268,6 +268,10 @@ impl KeyboardHandler for AppState {
             self.mark_toolbar_dirty();
         } else if is_ctrl && event.keysym == Keysym::z {
             self.undo();
+        }
+
+        if self.needs_redraw && !self.frame_pending {
+            self.draw(qh);
         }
     }
 
