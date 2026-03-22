@@ -39,6 +39,10 @@ Freehand curves use a multi-pass Laplacian smoothing filter combined with Quadra
 - **Levels**: Supports 0 (None), 1 (Low), and 2 (High).
 - **Iteration**: High-level smoothing uses 8 iterations of weighted averaging.
 
+### 5. Technical Documentation
+- **Mandate**: `Architecture.md` MUST remain the "source of truth" for the internal design.
+- **Workflow**: After any major architectural shift, feature implementation (e.g., new tools, sub-menus), or protocol change, you MUST review and update `Architecture.md` to reflect the new state.
+
 ## Development Workflow
 
 ### Building & Running
