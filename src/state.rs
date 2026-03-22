@@ -513,8 +513,9 @@ impl PointerHandler for AppState {
                                     thickness_button_clicked = true;
                                 } else if btn.icon == Tool::Line {
                                     line_button_clicked = true;
-                                    if button == 272 { self.current_tool = Tool::Line; }
-                                } else if self.current_tool != btn.icon {
+                                    if button == 272 || button == 273 { self.current_tool = Tool::Line; }
+                                }
+ else if self.current_tool != btn.icon {
                                     if button == 272 { self.current_tool = btn.icon; }
                                 }
                                 break;
