@@ -43,6 +43,7 @@ pub struct AppState {
     pub toolbar: Toolbar,
     pub current_tool: Tool,
     pub smoothness: u32,
+    pub last_non_zero_smoothness: u32,
     pub smooth_menu_open: bool,
     pub active_shape: Option<Shape>,
     pub completed_shapes: Vec<Shape>,
@@ -269,8 +270,16 @@ impl KeyboardHandler for AppState {
             self.current_tool = Tool::Arrow;
             self.mark_toolbar_dirty();
         } else if is_ctrl && event.keysym == Keysym::_4 {
-            self.smoothness = (self.smoothness + 1) % 3;
+            if self.smoothness > 0 {
+                self.last_non_zero_smoothness = self.smoothness;
+                self.smoothness = 0;
+            } else {
+                self.smoothness = self.last_non_zero_smoothness;
+            }
             self.mark_toolbar_dirty();
+            if !self.frame_pending {
+                self.draw(qh);
+            }
         }
  else if is_ctrl && event.keysym == Keysym::z {
             self.undo();
@@ -367,7 +376,7 @@ impl PointerHandler for AppState {
                     }
                 }
                 Press { button, .. } => {
-                    if button == 272 {
+                    if button == 272 || button == 273 {
                         let current_point = Point {
                             x: event.position.0 as f32,
                             y: event.position.1 as f32,
@@ -395,6 +404,9 @@ impl PointerHandler for AppState {
                                 let local_x = current_point.x - flyout_x as f32;
                                 let level = (local_x / 40.0).floor() as u32;
                                 self.smoothness = level.min(2);
+                                if self.smoothness > 0 {
+                                    self.last_non_zero_smoothness = self.smoothness;
+                                }
                                 self.smooth_menu_open = false;
                                 self.mark_toolbar_dirty();
                                 if !self.frame_pending {
@@ -407,22 +419,34 @@ impl PointerHandler for AppState {
                         // 2. Check if we clicked on the toolbar
                         let mut ui_clicked = false;
                         let mut smooth_button_clicked = false;
-                        for button in &self.toolbar.buttons {
-                            if button.rect.contains(current_point.x, current_point.y) {
+                        for btn in &self.toolbar.buttons {
+                            if btn.rect.contains(current_point.x, current_point.y) {
                                 ui_clicked = true;
-                                if button.icon == Tool::Undo {
-                                    self.undo();
-                                } else if button.icon == Tool::Smooth {
+                                if btn.icon == Tool::Undo {
+                                    if button == 272 { self.undo(); }
+                                } else if btn.icon == Tool::Smooth {
                                     smooth_button_clicked = true;
-                                } else if self.current_tool != button.icon {
-                                    self.current_tool = button.icon;
+                                } else if self.current_tool != btn.icon {
+                                    if button == 272 { self.current_tool = btn.icon; }
                                 }
                                 break;
                             }
                         }
 
                         if smooth_button_clicked {
-                            self.smooth_menu_open = !self.smooth_menu_open;
+                            if button == 273 {
+                                // Right click toggles menu
+                                self.smooth_menu_open = !self.smooth_menu_open;
+                            } else {
+                                // Left click toggles on/off
+                                if self.smoothness > 0 {
+                                    self.last_non_zero_smoothness = self.smoothness;
+                                    self.smoothness = 0;
+                                } else {
+                                    self.smoothness = self.last_non_zero_smoothness;
+                                }
+                                self.smooth_menu_open = false;
+                            }
                             self.mark_toolbar_dirty();
                             if !self.frame_pending {
                                 self.draw(qh);
@@ -431,10 +455,12 @@ impl PointerHandler for AppState {
                         }
 
                         if ui_clicked {
-                            self.smooth_menu_open = false;
-                            self.mark_toolbar_dirty();
-                            if !self.frame_pending {
-                                self.draw(qh);
+                            if button == 272 {
+                                self.smooth_menu_open = false;
+                                self.mark_toolbar_dirty();
+                                if !self.frame_pending {
+                                    self.draw(qh);
+                                }
                             }
                             return;
                         }
