@@ -43,6 +43,7 @@ pub struct AppState {
     pub toolbar: Toolbar,
     pub current_tool: Tool,
     pub active_shape: Option<Shape>,
+    pub completed_shapes: Vec<Shape>,
 
     pub completed_canvas: tiny_skia::Pixmap,
     pub last_active_stroke_rect: Option<Rect>,
@@ -265,6 +266,8 @@ impl KeyboardHandler for AppState {
         } else if is_ctrl && event.keysym == Keysym::_3 {
             self.current_tool = Tool::Arrow;
             self.mark_toolbar_dirty();
+        } else if is_ctrl && event.keysym == Keysym::z {
+            self.undo();
         }
     }
 
@@ -324,6 +327,7 @@ impl PointerHandler for AppState {
                         if let Some(bounds) = shape.bounding_box() {
                             // Bake into completed canvas
                             render_shape(&mut self.completed_canvas.as_mut(), &shape);
+                            self.completed_shapes.push(shape);
                             self.pending_damage = match &self.pending_damage {
                                 Some(d) => Some(d.union(&bounds)),
                                 None => Some(bounds),
@@ -363,7 +367,9 @@ impl PointerHandler for AppState {
                         let mut tool_changed = false;
                         for button in &self.toolbar.buttons {
                             if button.rect.contains(current_point.x, current_point.y) {
-                                if self.current_tool != button.icon {
+                                if button.icon == Tool::Undo {
+                                    self.undo();
+                                } else if self.current_tool != button.icon {
                                     self.current_tool = button.icon;
                                     tool_changed = true;
                                 }
@@ -397,6 +403,7 @@ impl PointerHandler for AppState {
                                     color: tiny_skia::Color::from_rgba8(255, 0, 0, 255),
                                     thickness: 4.0,
                                 },
+                                Tool::Undo => unreachable!("Undo is an action, not a drawable tool"),
                             };
                             self.active_shape = Some(shape);
                             needs_redraw = true;
@@ -409,6 +416,7 @@ impl PointerHandler for AppState {
                             if let Some(bounds) = shape.bounding_box() {
                                 // Bake into completed canvas
                                 render_shape(&mut self.completed_canvas.as_mut(), &shape);
+                                self.completed_shapes.push(shape);
                                 self.pending_damage = match &self.pending_damage {
                                     Some(d) => Some(d.union(&bounds)),
                                     None => Some(bounds),
@@ -444,6 +452,28 @@ impl AppState {
             None => Some(self.toolbar.rect.clone()),
         };
         self.needs_redraw = true;
+    }
+
+    pub fn undo(&mut self) {
+        if self.completed_shapes.pop().is_some() {
+            // 1. Clear the bitmap
+            self.completed_canvas.fill(tiny_skia::Color::TRANSPARENT);
+
+            // 2. Re-render all remaining shapes
+            let mut pixmap = self.completed_canvas.as_mut();
+            for shape in &self.completed_shapes {
+                render_shape(&mut pixmap, shape);
+            }
+
+            // 3. Damage full screen to ensure the removed shape is cleared
+            self.pending_damage = Some(Rect {
+                x: 0,
+                y: 0,
+                w: self.width,
+                h: self.height,
+            });
+            self.needs_redraw = true;
+        }
     }
 
     pub fn draw(&mut self, qh: &QueueHandle<Self>) {
