@@ -17,7 +17,7 @@
 - **UI Interaction**: Manually hit-test pointer events against `Rect` primitives to handle toolbar buttons, toggle-actions, and flyout menus.
 - **Keyboard Events**: Capture specific keybinds natively:
     - `Esc`: Quit application.
-    - `Ctrl+1/2/3`: Switch between Freehand, Rectangle, and Arrow tools.
+    - `Ctrl+1/2/3`: Switch between Freehand, Rectangle, and Line/Arrow tools.
     - `Ctrl+4`: Toggle Smoothing.
     - `Ctrl+Z`: Undo last stroke.
     - `Ctrl+D`: Clear screen.

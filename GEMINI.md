@@ -49,7 +49,7 @@ Freehand curves use a multi-pass Laplacian smoothing filter combined with Quadra
 ### Tool Control Shortcuts
 - **Freehand**: `Ctrl+1`
 - **Rectangle**: `Ctrl+2`
-- **Arrow**: `Ctrl+3`
+- **Line/Arrow**: `Ctrl+3` (Right-click button to toggle mode)
 - **Toggle Smoothing**: `Ctrl+4` (Toggles between Off and Last Active Level).
 - **Undo**: `Ctrl+Z`
 

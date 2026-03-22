@@ -40,6 +40,7 @@ pub fn render_toolbar(
     smooth_menu_open: bool,
     thickness: f32,
     thickness_menu_open: bool,
+    line_has_arrow: bool,
 ) {
     let mut paint = tiny_skia::Paint::default();
     paint.set_color(tiny_skia::Color::from_rgba8(40, 44, 52, 230)); // Dark background with alpha
@@ -58,7 +59,7 @@ pub fn render_toolbar(
     let mut sep_paint = tiny_skia::Paint::default();
     sep_paint.set_color(tiny_skia::Color::from_rgba8(80, 84, 92, 255));
 
-    // Separator after Arrow (3rd tool)
+    // Separator after Line (3rd tool)
     if toolbar.buttons.len() >= 4 {
         let b3 = &toolbar.buttons[2];
         let sep_y = b3.rect.y + b3.rect.h as i32 + 10;
@@ -135,6 +136,21 @@ pub fn render_toolbar(
         .pre_scale(icon_size / 24.0, icon_size / 24.0); // SVGs are 24x24
 
         resvg::render(&button.svg_tree, ts, pixmap);
+
+        // For the Line tool, we might need to over-render the correct mode icon
+        if button.icon == Tool::Line {
+            let icon_idx = if line_has_arrow { 1 } else { 0 };
+            if let Some(tree) = toolbar.line_icons.get(icon_idx) {
+                // Clear the previous icon area by re-drawing the button background
+                pixmap.fill_rect(
+                    button_rect,
+                    &button_paint,
+                    tiny_skia::Transform::identity(),
+                    None,
+                );
+                resvg::render(tree, ts, pixmap);
+            }
+        }
 
         // Render Flyout for Smooth
         if button.icon == Tool::Smooth && smooth_menu_open {
@@ -276,37 +292,40 @@ pub fn render_shape(pixmap: &mut tiny_skia::PixmapMut, shape: &Shape) {
 
             (*color, *thickness)
         }
-        Shape::Arrow {
+        Shape::Line {
             start,
             end,
             color,
             thickness,
+            has_arrow,
         } => {
             // Main line
             pb.move_to(start.x, start.y);
             pb.line_to(end.x, end.y);
 
             // Arrowhead
-            let dx = end.x - start.x;
-            let dy = end.y - start.y;
-            let len = (dx * dx + dy * dy).sqrt();
+            if *has_arrow {
+                let dx = end.x - start.x;
+                let dy = end.y - start.y;
+                let len = (dx * dx + dy * dy).sqrt();
 
-            if len > 0.1 {
-                let head_len = 15.0 + (*thickness * 1.5); // Adjust size as needed
-                let head_angle = std::f32::consts::PI / 6.0; // 30 degrees
+                if len > 0.1 {
+                    let head_len = 15.0 + (*thickness * 1.5); // Adjust size as needed
+                    let head_angle = std::f32::consts::PI / 6.0; // 30 degrees
 
-                let angle = dy.atan2(dx);
+                    let angle = dy.atan2(dx);
 
-                let x1 = end.x - head_len * (angle - head_angle).cos();
-                let y1 = end.y - head_len * (angle - head_angle).sin();
+                    let x1 = end.x - head_len * (angle - head_angle).cos();
+                    let y1 = end.y - head_len * (angle - head_angle).sin();
 
-                let x2 = end.x - head_len * (angle + head_angle).cos();
-                let y2 = end.y - head_len * (angle + head_angle).sin();
+                    let x2 = end.x - head_len * (angle + head_angle).cos();
+                    let y2 = end.y - head_len * (angle + head_angle).sin();
 
-                pb.move_to(end.x, end.y);
-                pb.line_to(x1, y1);
-                pb.move_to(end.x, end.y);
-                pb.line_to(x2, y2);
+                    pb.move_to(end.x, end.y);
+                    pb.line_to(x1, y1);
+                    pb.move_to(end.x, end.y);
+                    pb.line_to(x2, y2);
+                }
             }
 
             (*color, *thickness)

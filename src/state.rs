@@ -51,6 +51,7 @@ pub struct AppState {
     pub thickness: f32,
     pub last_non_zero_thickness: f32,
     pub thickness_menu_open: bool,
+    pub line_has_arrow: bool,
     pub active_shape: Option<Shape>,
     pub completed_shapes: Vec<Shape>,
 
@@ -273,7 +274,7 @@ impl KeyboardHandler for AppState {
             self.current_tool = Tool::Rectangle;
             self.mark_toolbar_dirty();
         } else if is_ctrl && event.keysym == Keysym::_3 {
-            self.current_tool = Tool::Arrow;
+            self.current_tool = Tool::Line;
             self.mark_toolbar_dirty();
         } else if is_ctrl && event.keysym == Keysym::_4 {
             if self.smoothness > 0 {
@@ -383,7 +384,7 @@ impl PointerHandler for AppState {
                             Shape::Rectangle { end, .. } => {
                                 *end = current_point;
                             }
-                            Shape::Arrow { end, .. } => {
+                            Shape::Line { end, .. } => {
                                 *end = current_point;
                             }
                         }
@@ -467,6 +468,7 @@ impl PointerHandler for AppState {
                         let mut ui_clicked = false;
                         let mut smooth_button_clicked = false;
                         let mut thickness_button_clicked = false;
+                        let mut line_button_clicked = false;
                         for btn in &self.toolbar.buttons {
                             if btn.rect.contains(current_point.x, current_point.y) {
                                 ui_clicked = true;
@@ -478,11 +480,23 @@ impl PointerHandler for AppState {
                                     smooth_button_clicked = true;
                                 } else if btn.icon == Tool::Thickness {
                                     thickness_button_clicked = true;
+                                } else if btn.icon == Tool::Line {
+                                    line_button_clicked = true;
+                                    if button == 272 { self.current_tool = Tool::Line; }
                                 } else if self.current_tool != btn.icon {
                                     if button == 272 { self.current_tool = btn.icon; }
                                 }
                                 break;
                             }
+                        }
+
+                        if line_button_clicked && button == 273 {
+                            self.line_has_arrow = !self.line_has_arrow;
+                            self.mark_toolbar_dirty();
+                            if !self.frame_pending {
+                                self.draw(qh);
+                            }
+                            return;
                         }
 
                         if smooth_button_clicked {
@@ -558,11 +572,12 @@ impl PointerHandler for AppState {
                                     color: tiny_skia::Color::from_rgba8(255, 0, 0, 255),
                                     thickness: self.thickness,
                                 },
-                                Tool::Arrow => Shape::Arrow {
+                                Tool::Line => Shape::Line {
                                     start: current_point.clone(),
                                     end: current_point,
                                     color: tiny_skia::Color::from_rgba8(255, 0, 0, 255),
                                     thickness: self.thickness,
+                                    has_arrow: self.line_has_arrow,
                                 },
                                 Tool::Freehand => Shape::Freehand {
                                     points: vec![current_point],
@@ -758,6 +773,7 @@ impl AppState {
                     self.smooth_menu_open,
                     self.thickness,
                     self.thickness_menu_open,
+                    self.line_has_arrow,
                 );
             }
 

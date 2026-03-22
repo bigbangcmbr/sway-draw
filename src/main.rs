@@ -85,6 +85,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         thickness: 4.0,
         last_non_zero_thickness: 4.0,
         thickness_menu_open: false,
+        line_has_arrow: true,
         active_shape: None,
         completed_shapes: Vec::new(),
         completed_canvas: tiny_skia::Pixmap::new(1920, 1080).unwrap(),

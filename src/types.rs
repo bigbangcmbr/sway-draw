@@ -2,6 +2,7 @@ use resvg::usvg;
 
 const SVG_FREEHAND: &str = r#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/><path d="M2 2l8 8"/><path d="M2 22l5-5"/></svg>"#;
 const SVG_RECTANGLE: &str = r#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/></svg>"#;
+const SVG_LINE: &str = r#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/></svg>"#;
 const SVG_ARROW: &str = r#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>"#;
 const SVG_SMOOTH: &str = r#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3V5"/><path d="M5 8H3"/><path d="M21 8H19"/><path d="M18 15L16 13L14 15"/><path d="M16 13V21"/><path d="M12 21H16"/><path d="M7 21H11"/><path d="M9 21V13L7 15"/><path d="M2 13L4 15L6 13"/><path d="M18 13L20 15L22 13"/></svg>"#;
 const SVG_THICKNESS: &str = r#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="12" x2="20" y2="12" stroke-width="1"/><line x1="4" y1="16" x2="20" y2="16" stroke-width="4"/><line x1="4" y1="20" x2="20" y2="20" stroke-width="8"/></svg>"#;
@@ -21,7 +22,7 @@ fn get_tool_svg(tool: Tool) -> &'static str {
     match tool {
         Tool::Freehand => SVG_FREEHAND,
         Tool::Rectangle => SVG_RECTANGLE,
-        Tool::Arrow => SVG_ARROW,
+        Tool::Line => SVG_LINE,
         Tool::Smooth => SVG_SMOOTH,
         Tool::Thickness => SVG_THICKNESS,
         Tool::Clear => SVG_CLEAR,
@@ -88,7 +89,7 @@ impl Rect {
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Tool {
     Rectangle,
-    Arrow,
+    Line,
     Freehand,
     Smooth,
     Thickness,
@@ -110,11 +111,12 @@ pub enum Shape {
         color: tiny_skia::Color,
         thickness: f32,
     },
-    Arrow {
+    Line {
         start: Point,
         end: Point,
         color: tiny_skia::Color,
         thickness: f32,
+        has_arrow: bool,
     },
 }
 
@@ -146,7 +148,7 @@ impl Shape {
                 thickness,
                 ..
             }
-            | Shape::Arrow {
+            | Shape::Line {
                 start,
                 end,
                 thickness,
@@ -163,9 +165,9 @@ impl Shape {
         // Pad by thickness
         let pad = thickness / 2.0 + 2.0; // slight extra padding for anti-aliasing edge cases
 
-        // For Arrow, pad a bit more to account for arrowhead which can extend slightly beyond bounds
+        // For Arrow/Line with arrow, pad a bit more to account for arrowhead which can extend slightly beyond bounds
         let pad = match self {
-            Shape::Arrow { thickness, .. } => pad + (*thickness * 3.0),
+            Shape::Line { thickness, has_arrow: true, .. } => pad + (*thickness * 3.0),
             _ => pad,
         };
 
@@ -194,6 +196,7 @@ pub struct Toolbar {
     pub buttons: Vec<Button>,
     pub smooth_level_icons: Vec<usvg::Tree>,
     pub thickness_icons: Vec<usvg::Tree>,
+    pub line_icons: Vec<usvg::Tree>,
 }
 
 impl Toolbar {
@@ -208,7 +211,7 @@ impl Toolbar {
         let tools = [
             Tool::Freehand,
             Tool::Rectangle,
-            Tool::Arrow,
+            Tool::Line,
             Tool::Smooth,
             Tool::Thickness,
             Tool::Clear,
@@ -222,7 +225,7 @@ impl Toolbar {
             let svg_str = get_tool_svg(*tool);
             let svg_tree = usvg::Tree::from_str(svg_str, &opt).unwrap();
 
-            // Add extra space after the third tool (Arrow) and fifth tool (Thickness) for separators
+            // Add extra space after the third tool (Line) and fifth tool (Thickness) for separators
             // Current padding is 10px. Adding 10px more creates a 20px total gap.
             let mut extra_y = 0;
             if i >= 3 { extra_y += 10; }
@@ -250,6 +253,11 @@ impl Toolbar {
             thickness_icons.push(usvg::Tree::from_str(svg_str, &opt).unwrap());
         }
 
+        let mut line_icons = Vec::new();
+        for svg_str in [SVG_LINE, SVG_ARROW] {
+            line_icons.push(usvg::Tree::from_str(svg_str, &opt).unwrap());
+        }
+
         Toolbar {
             rect: Rect {
                 x,
@@ -260,6 +268,7 @@ impl Toolbar {
             buttons,
             smooth_level_icons,
             thickness_icons,
+            line_icons,
         }
     }
 }
