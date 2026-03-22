@@ -2,6 +2,13 @@
 name = "sway-draw"
 version = "0.1.0"
 edition = "2021"
+description = "A lightweight, native Wayland screen annotation and drawing utility."
+license = "GPL-3.0-only"
+repository = "https://github.com/vedanshbodkhe21/sway-draw"
+homepage = "https://github.com/vedanshbodkhe21/sway-draw"
+readme = "README.md"
+keywords = ["wayland", "sway", "annotation", "drawing", "overlay"]
+categories = ["command-line-utilities", "multimedia::graphics"]
 
 [dependencies]
 env_logger = "0.11.9"
