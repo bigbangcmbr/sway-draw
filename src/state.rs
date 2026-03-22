@@ -289,6 +289,8 @@ impl KeyboardHandler for AppState {
         }
  else if is_ctrl && event.keysym == Keysym::z {
             self.undo();
+        } else if is_ctrl && (event.keysym == Keysym::d || event.keysym == Keysym::D) {
+            self.clear();
         }
 
         if self.needs_redraw && !self.frame_pending {
@@ -470,6 +472,8 @@ impl PointerHandler for AppState {
                                 ui_clicked = true;
                                 if btn.icon == Tool::Undo {
                                     if button == 272 { self.undo(); }
+                                } else if btn.icon == Tool::Clear {
+                                    if button == 272 { self.clear(); }
                                 } else if btn.icon == Tool::Smooth {
                                     smooth_button_clicked = true;
                                 } else if btn.icon == Tool::Thickness {
@@ -567,6 +571,7 @@ impl PointerHandler for AppState {
                                     smoothness: self.smoothness,
                                 },
                                 Tool::Undo => unreachable!("Undo is an action, not a drawable tool"),
+                                Tool::Clear => unreachable!("Clear is an action, not a drawable tool"),
                                 Tool::Smooth => unreachable!("Smooth is a toggle action"),
                                 Tool::Thickness => unreachable!("Thickness is a toggle action"),
                             };
@@ -644,6 +649,19 @@ impl AppState {
             });
             self.needs_redraw = true;
         }
+    }
+
+    pub fn clear(&mut self) {
+        self.completed_shapes.clear();
+        self.completed_canvas.fill(tiny_skia::Color::TRANSPARENT);
+        self.active_shape = None;
+        self.pending_damage = Some(Rect {
+            x: 0,
+            y: 0,
+            w: self.width,
+            h: self.height,
+        });
+        self.needs_redraw = true;
     }
 
     pub fn draw(&mut self, qh: &QueueHandle<Self>) {

@@ -5,6 +5,7 @@ const SVG_RECTANGLE: &str = r#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="
 const SVG_ARROW: &str = r#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>"#;
 const SVG_SMOOTH: &str = r#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3V5"/><path d="M5 8H3"/><path d="M21 8H19"/><path d="M18 15L16 13L14 15"/><path d="M16 13V21"/><path d="M12 21H16"/><path d="M7 21H11"/><path d="M9 21V13L7 15"/><path d="M2 13L4 15L6 13"/><path d="M18 13L20 15L22 13"/></svg>"#;
 const SVG_THICKNESS: &str = r#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="12" x2="20" y2="12" stroke-width="1"/><line x1="4" y1="16" x2="20" y2="16" stroke-width="4"/><line x1="4" y1="20" x2="20" y2="20" stroke-width="8"/></svg>"#;
+const SVG_CLEAR: &str = r#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>"#;
 const SVG_UNDO: &str = r#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7v6h6"/><path d="M21 17a9 9 0 00-9-9 9 9 0 00-6 2.3L3 13"/></svg>"#;
 
 const SVG_SMOOTH_0: &str = r#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h18"/><path d="M12 3v18" opacity="0.1"/></svg>"#;
@@ -23,6 +24,7 @@ fn get_tool_svg(tool: Tool) -> &'static str {
         Tool::Arrow => SVG_ARROW,
         Tool::Smooth => SVG_SMOOTH,
         Tool::Thickness => SVG_THICKNESS,
+        Tool::Clear => SVG_CLEAR,
         Tool::Undo => SVG_UNDO,
     }
 }
@@ -90,6 +92,7 @@ pub enum Tool {
     Freehand,
     Smooth,
     Thickness,
+    Clear,
     Undo,
 }
 
@@ -199,7 +202,7 @@ impl Toolbar {
         let button_size = 40;
         let padding = 10;
         let x = 20; // Positioned 20px from left
-        let y = (screen_height as i32 - (6 * (button_size + padding))) / 2; // Centered vertically, 6 buttons now
+        let y = (screen_height as i32 - (7 * (button_size + padding))) / 2; // Centered vertically, 7 buttons now
 
         let mut buttons = Vec::new();
         let tools = [
@@ -208,6 +211,7 @@ impl Toolbar {
             Tool::Arrow,
             Tool::Smooth,
             Tool::Thickness,
+            Tool::Clear,
             Tool::Undo,
         ];
 
@@ -218,10 +222,16 @@ impl Toolbar {
             let svg_str = get_tool_svg(*tool);
             let svg_tree = usvg::Tree::from_str(svg_str, &opt).unwrap();
 
+            // Add extra space after the third tool (Arrow) and fifth tool (Thickness) for separators
+            // Current padding is 10px. Adding 10px more creates a 20px total gap.
+            let mut extra_y = 0;
+            if i >= 3 { extra_y += 10; }
+            if i >= 5 { extra_y += 10; }
+
             buttons.push(Button {
                 rect: Rect {
                     x: x + (width - button_size) / 2,
-                    y: y + padding + (i as i32 * (button_size + padding)),
+                    y: y + padding + (i as i32 * (button_size + padding)) + extra_y,
                     w: button_size as u32,
                     h: button_size as u32,
                 },
@@ -245,7 +255,7 @@ impl Toolbar {
                 x,
                 y,
                 w: width as u32,
-                h: (buttons.len() as i32 * (button_size + padding) + padding) as u32,
+                h: (buttons.len() as i32 * (button_size + padding) + padding + 20) as u32,
             },
             buttons,
             smooth_level_icons,

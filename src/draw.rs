@@ -54,6 +54,38 @@ pub fn render_toolbar(
 
     pixmap.fill_rect(rect, &paint, tiny_skia::Transform::identity(), None);
 
+    // Draw separators
+    let mut sep_paint = tiny_skia::Paint::default();
+    sep_paint.set_color(tiny_skia::Color::from_rgba8(80, 84, 92, 255));
+
+    // Separator after Arrow (3rd tool)
+    if toolbar.buttons.len() >= 4 {
+        let b3 = &toolbar.buttons[2];
+        let sep_y = b3.rect.y + b3.rect.h as i32 + 10;
+        let sep_rect = tiny_skia::Rect::from_xywh(
+            toolbar.rect.x as f32 + 10.0,
+            sep_y as f32,
+            toolbar.rect.w as f32 - 20.0,
+            1.0,
+        )
+        .unwrap();
+        pixmap.fill_rect(sep_rect, &sep_paint, tiny_skia::Transform::identity(), None);
+    }
+
+    // Separator after Thickness (5th tool)
+    if toolbar.buttons.len() >= 6 {
+        let b5 = &toolbar.buttons[4];
+        let sep_y = b5.rect.y + b5.rect.h as i32 + 10;
+        let sep_rect = tiny_skia::Rect::from_xywh(
+            toolbar.rect.x as f32 + 10.0,
+            sep_y as f32,
+            toolbar.rect.w as f32 - 20.0,
+            1.0,
+        )
+        .unwrap();
+        pixmap.fill_rect(sep_rect, &sep_paint, tiny_skia::Transform::identity(), None);
+    }
+
     for button in &toolbar.buttons {
         let mut button_paint = tiny_skia::Paint::default();
         let is_active = if button.icon == Tool::Smooth {
