@@ -41,6 +41,7 @@ pub fn render_toolbar(
     thickness: f32,
     thickness_menu_open: bool,
     line_has_arrow: bool,
+    line_menu_open: bool,
 ) {
     let mut paint = tiny_skia::Paint::default();
     paint.set_color(tiny_skia::Color::from_rgba8(40, 44, 52, 230)); // Dark background with alpha
@@ -222,6 +223,45 @@ pub fn render_toolbar(
                 pixmap.fill_rect(level_rect, &level_paint, tiny_skia::Transform::identity(), None);
 
                 if let Some(tree) = toolbar.thickness_icons.get(idx) {
+                    let target_size = 24.0;
+                    let scale = target_size / 24.0;
+                    let offset = (36.0 - target_size) / 2.0;
+                    let ts = tiny_skia::Transform::from_translate(level_x + 2.0 + offset, flyout_y + 2.0 + offset)
+                        .pre_scale(scale, scale);
+                    
+                    resvg::render(tree, ts, pixmap);
+                }
+            }
+        }
+
+        // Render Flyout for Line Mode
+        if button.icon == Tool::Line && line_menu_open {
+            let flyout_x = toolbar.rect.x as f32 + toolbar.rect.w as f32 + 10.0;
+            let flyout_y = button.rect.y as f32;
+            let flyout_w = 80.0; // 40px * 2 modes
+            let flyout_h = 40.0;
+
+            let mut flyout_paint = tiny_skia::Paint::default();
+            flyout_paint.set_color(tiny_skia::Color::from_rgba8(40, 44, 52, 230));
+
+            let flyout_rect = tiny_skia::Rect::from_xywh(flyout_x, flyout_y, flyout_w, flyout_h).unwrap();
+            pixmap.fill_rect(flyout_rect, &flyout_paint, tiny_skia::Transform::identity(), None);
+
+            for idx in 0..2 {
+                let level_x = flyout_x + (idx as f32 * 40.0);
+                let is_mode_active = if idx == 0 { !line_has_arrow } else { line_has_arrow };
+
+                let mut mode_paint = tiny_skia::Paint::default();
+                if is_mode_active {
+                    mode_paint.set_color(tiny_skia::Color::from_rgba8(80, 80, 200, 255));
+                } else {
+                    mode_paint.set_color(tiny_skia::Color::from_rgba8(70, 74, 82, 255));
+                }
+
+                let mode_rect = tiny_skia::Rect::from_xywh(level_x + 2.0, flyout_y + 2.0, 36.0, 36.0).unwrap();
+                pixmap.fill_rect(mode_rect, &mode_paint, tiny_skia::Transform::identity(), None);
+
+                if let Some(tree) = toolbar.line_icons.get(idx) {
                     let target_size = 24.0;
                     let scale = target_size / 24.0;
                     let offset = (36.0 - target_size) / 2.0;

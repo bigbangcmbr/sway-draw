@@ -52,6 +52,7 @@ pub struct AppState {
     pub last_non_zero_thickness: f32,
     pub thickness_menu_open: bool,
     pub line_has_arrow: bool,
+    pub line_menu_open: bool,
     pub active_shape: Option<Shape>,
     pub completed_shapes: Vec<Shape>,
 
@@ -464,6 +465,36 @@ impl PointerHandler for AppState {
                             }
                         }
 
+                        if self.line_menu_open {
+                            let flyout_x = self.toolbar.rect.x + self.toolbar.rect.w as i32 + 10;
+                            let mut line_y = self.toolbar.rect.y;
+                            for b in &self.toolbar.buttons {
+                                if b.icon == Tool::Line {
+                                    line_y = b.rect.y;
+                                    break;
+                                }
+                            }
+
+                            let flyout_rect = Rect {
+                                x: flyout_x,
+                                y: line_y,
+                                w: 80, // 2 modes * 40px
+                                h: 40,
+                            };
+
+                            if flyout_rect.contains(current_point.x, current_point.y) {
+                                let local_x = current_point.x - flyout_x as f32;
+                                let idx = (local_x / 40.0).floor() as usize;
+                                self.line_has_arrow = idx != 0;
+                                self.line_menu_open = false;
+                                self.mark_toolbar_dirty();
+                                if !self.frame_pending {
+                                    self.draw(qh);
+                                }
+                                return;
+                            }
+                        }
+
                         // 2. Check if we clicked on the toolbar
                         let mut ui_clicked = false;
                         let mut smooth_button_clicked = false;
@@ -490,8 +521,16 @@ impl PointerHandler for AppState {
                             }
                         }
 
-                        if line_button_clicked && button == 273 {
-                            self.line_has_arrow = !self.line_has_arrow;
+                        if line_button_clicked {
+                            if button == 273 {
+                                // Right click toggles menu
+                                self.line_menu_open = !self.line_menu_open;
+                                self.smooth_menu_open = false;
+                                self.thickness_menu_open = false;
+                            } else {
+                                // Left click just selects the tool
+                                self.line_menu_open = false;
+                            }
                             self.mark_toolbar_dirty();
                             if !self.frame_pending {
                                 self.draw(qh);
@@ -718,7 +757,7 @@ impl AppState {
         // For simplicity, let's just union the toolbar rect with dirty rect if anything changed
         if dirty_rect.is_some() {
             let mut ui_area = self.toolbar.rect.clone();
-            if self.smooth_menu_open || self.thickness_menu_open {
+            if self.smooth_menu_open || self.thickness_menu_open || self.line_menu_open {
                 ui_area.w += 170;
             }
             dirty_rect = match dirty_rect {
@@ -774,6 +813,7 @@ impl AppState {
                     self.thickness,
                     self.thickness_menu_open,
                     self.line_has_arrow,
+                    self.line_menu_open,
                 );
             }
 
