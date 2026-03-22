@@ -38,6 +38,8 @@ pub fn render_toolbar(
     current_tool: Tool,
     smoothness: u32,
     smooth_menu_open: bool,
+    thickness: f32,
+    thickness_menu_open: bool,
 ) {
     let mut paint = tiny_skia::Paint::default();
     paint.set_color(tiny_skia::Color::from_rgba8(40, 44, 52, 230)); // Dark background with alpha
@@ -56,6 +58,8 @@ pub fn render_toolbar(
         let mut button_paint = tiny_skia::Paint::default();
         let is_active = if button.icon == Tool::Smooth {
             smoothness > 0
+        } else if button.icon == Tool::Thickness {
+            true // Thickness is always "active" in terms of showing a level
         } else {
             button.icon == current_tool
         };
@@ -63,6 +67,8 @@ pub fn render_toolbar(
         if is_active {
             let alpha = if button.icon == Tool::Smooth {
                 if smoothness == 1 { 150 } else { 255 }
+            } else if button.icon == Tool::Thickness {
+                150 // Constant light highlight for thickness
             } else {
                 255
             };
@@ -98,7 +104,7 @@ pub fn render_toolbar(
 
         resvg::render(&button.svg_tree, ts, pixmap);
 
-        // Render Flyout
+        // Render Flyout for Smooth
         if button.icon == Tool::Smooth && smooth_menu_open {
             let flyout_x = toolbar.rect.x as f32 + toolbar.rect.w as f32 + 10.0;
             let flyout_y = button.rect.y as f32;
@@ -128,6 +134,46 @@ pub fn render_toolbar(
 
                 // Render level SVG icon centered in the 36x36 button
                 if let Some(tree) = toolbar.smooth_level_icons.get(level as usize) {
+                    let target_size = 24.0;
+                    let scale = target_size / 24.0;
+                    let offset = (36.0 - target_size) / 2.0;
+                    let ts = tiny_skia::Transform::from_translate(level_x + 2.0 + offset, flyout_y + 2.0 + offset)
+                        .pre_scale(scale, scale);
+                    
+                    resvg::render(tree, ts, pixmap);
+                }
+            }
+        }
+
+        // Render Flyout for Thickness
+        if button.icon == Tool::Thickness && thickness_menu_open {
+            let flyout_x = toolbar.rect.x as f32 + toolbar.rect.w as f32 + 10.0;
+            let flyout_y = button.rect.y as f32;
+            let flyout_w = 160.0; // 40px * 4 levels
+            let flyout_h = 40.0;
+
+            let mut flyout_paint = tiny_skia::Paint::default();
+            flyout_paint.set_color(tiny_skia::Color::from_rgba8(40, 44, 52, 230));
+
+            let flyout_rect = tiny_skia::Rect::from_xywh(flyout_x, flyout_y, flyout_w, flyout_h).unwrap();
+            pixmap.fill_rect(flyout_rect, &flyout_paint, tiny_skia::Transform::identity(), None);
+
+            let thickness_values = [2.0, 4.0, 8.0, 16.0];
+            for (idx, &val) in thickness_values.iter().enumerate() {
+                let level_x = flyout_x + (idx as f32 * 40.0);
+                let is_level_active = (val - thickness).abs() < 0.1;
+
+                let mut level_paint = tiny_skia::Paint::default();
+                if is_level_active {
+                    level_paint.set_color(tiny_skia::Color::from_rgba8(80, 80, 200, 255));
+                } else {
+                    level_paint.set_color(tiny_skia::Color::from_rgba8(70, 74, 82, 255));
+                }
+
+                let level_rect = tiny_skia::Rect::from_xywh(level_x + 2.0, flyout_y + 2.0, 36.0, 36.0).unwrap();
+                pixmap.fill_rect(level_rect, &level_paint, tiny_skia::Transform::identity(), None);
+
+                if let Some(tree) = toolbar.thickness_icons.get(idx) {
                     let target_size = 24.0;
                     let scale = target_size / 24.0;
                     let offset = (36.0 - target_size) / 2.0;

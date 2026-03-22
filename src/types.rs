@@ -4,11 +4,17 @@ const SVG_FREEHAND: &str = r#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0
 const SVG_RECTANGLE: &str = r#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/></svg>"#;
 const SVG_ARROW: &str = r#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>"#;
 const SVG_SMOOTH: &str = r#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3V5"/><path d="M5 8H3"/><path d="M21 8H19"/><path d="M18 15L16 13L14 15"/><path d="M16 13V21"/><path d="M12 21H16"/><path d="M7 21H11"/><path d="M9 21V13L7 15"/><path d="M2 13L4 15L6 13"/><path d="M18 13L20 15L22 13"/></svg>"#;
+const SVG_THICKNESS: &str = r#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="12" x2="20" y2="12" stroke-width="1"/><line x1="4" y1="16" x2="20" y2="16" stroke-width="4"/><line x1="4" y1="20" x2="20" y2="20" stroke-width="8"/></svg>"#;
 const SVG_UNDO: &str = r#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7v6h6"/><path d="M21 17a9 9 0 00-9-9 9 9 0 00-6 2.3L3 13"/></svg>"#;
 
 const SVG_SMOOTH_0: &str = r#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h18"/><path d="M12 3v18" opacity="0.1"/></svg>"#;
 const SVG_SMOOTH_1: &str = r#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 16c3-2 6-2 9 0s6 2 9 0"/></svg>"#;
 const SVG_SMOOTH_2: &str = r#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12c6-8 12 8 18 0"/></svg>"#;
+
+const SVG_THICKNESS_1: &str = r#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="2" fill="currentColor"/></svg>"#;
+const SVG_THICKNESS_2: &str = r#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4" fill="currentColor"/></svg>"#;
+const SVG_THICKNESS_3: &str = r#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="6" fill="currentColor"/></svg>"#;
+const SVG_THICKNESS_4: &str = r#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8" fill="currentColor"/></svg>"#;
 
 fn get_tool_svg(tool: Tool) -> &'static str {
     match tool {
@@ -16,6 +22,7 @@ fn get_tool_svg(tool: Tool) -> &'static str {
         Tool::Rectangle => SVG_RECTANGLE,
         Tool::Arrow => SVG_ARROW,
         Tool::Smooth => SVG_SMOOTH,
+        Tool::Thickness => SVG_THICKNESS,
         Tool::Undo => SVG_UNDO,
     }
 }
@@ -82,6 +89,7 @@ pub enum Tool {
     Arrow,
     Freehand,
     Smooth,
+    Thickness,
     Undo,
 }
 
@@ -182,6 +190,7 @@ pub struct Toolbar {
     pub rect: Rect,
     pub buttons: Vec<Button>,
     pub smooth_level_icons: Vec<usvg::Tree>,
+    pub thickness_icons: Vec<usvg::Tree>,
 }
 
 impl Toolbar {
@@ -190,7 +199,7 @@ impl Toolbar {
         let button_size = 40;
         let padding = 10;
         let x = 20; // Positioned 20px from left
-        let y = (screen_height as i32 - (5 * (button_size + padding))) / 2; // Centered vertically, 5 buttons now
+        let y = (screen_height as i32 - (6 * (button_size + padding))) / 2; // Centered vertically, 6 buttons now
 
         let mut buttons = Vec::new();
         let tools = [
@@ -198,6 +207,7 @@ impl Toolbar {
             Tool::Rectangle,
             Tool::Arrow,
             Tool::Smooth,
+            Tool::Thickness,
             Tool::Undo,
         ];
 
@@ -225,6 +235,11 @@ impl Toolbar {
             smooth_level_icons.push(usvg::Tree::from_str(svg_str, &opt).unwrap());
         }
 
+        let mut thickness_icons = Vec::new();
+        for svg_str in [SVG_THICKNESS_1, SVG_THICKNESS_2, SVG_THICKNESS_3, SVG_THICKNESS_4] {
+            thickness_icons.push(usvg::Tree::from_str(svg_str, &opt).unwrap());
+        }
+
         Toolbar {
             rect: Rect {
                 x,
@@ -234,6 +249,7 @@ impl Toolbar {
             },
             buttons,
             smooth_level_icons,
+            thickness_icons,
         }
     }
 }

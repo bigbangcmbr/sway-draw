@@ -14,11 +14,13 @@ use smithay_client_toolkit::{
         WaylandSurface,
     },
     shm::{slot::SlotPool, Shm, ShmHandler},
+    seat::pointer::cursor_shape::CursorShapeManager,
 };
 use wayland_client::{
     protocol::{wl_keyboard, wl_output, wl_pointer, wl_seat, wl_surface},
     Connection, QueueHandle,
 };
+use wayland_protocols::wp::cursor_shape::v1::client::wp_cursor_shape_device_v1::Shape as CursorShape;
 
 use crate::draw::{render_shape, render_toolbar};
 use crate::types::{Point, Rect, Shape, Tool, Toolbar};
@@ -28,6 +30,7 @@ pub struct AppState {
     pub seat_state: SeatState,
     pub output_state: OutputState,
     pub shm: Shm,
+    pub cursor_shape_manager: Option<CursorShapeManager>,
 
     pub exit: bool,
     pub first_configure: bool,
@@ -45,6 +48,9 @@ pub struct AppState {
     pub smoothness: u32,
     pub last_non_zero_smoothness: u32,
     pub smooth_menu_open: bool,
+    pub thickness: f32,
+    pub last_non_zero_thickness: f32,
+    pub thickness_menu_open: bool,
     pub active_shape: Option<Shape>,
     pub completed_shapes: Vec<Shape>,
 
@@ -329,7 +335,7 @@ impl PointerHandler for AppState {
         &mut self,
         _conn: &Connection,
         qh: &QueueHandle<Self>,
-        _pointer: &wl_pointer::WlPointer,
+        pointer: &wl_pointer::WlPointer,
         events: &[PointerEvent],
     ) {
         use PointerEventKind::*;
@@ -340,7 +346,14 @@ impl PointerHandler for AppState {
                 continue;
             }
             match event.kind {
-                Enter { .. } => log::debug!("Pointer entered"),
+                Enter { serial, .. } => {
+                    log::debug!("Pointer entered");
+                    if let Some(manager) = &self.cursor_shape_manager {
+                        let device = manager.get_shape_device(pointer, qh);
+                        device.set_shape(serial, CursorShape::Default);
+                        device.destroy();
+                    }
+                }
                 Leave { .. } => {
                     if let Some(shape) = self.active_shape.take() {
                         if let Some(bounds) = shape.bounding_box() {
@@ -382,7 +395,7 @@ impl PointerHandler for AppState {
                             y: event.position.1 as f32,
                         };
 
-                        // 1. Check if we clicked in the flyout menu (if open)
+                        // 1. Check if we clicked in the flyout menus (if open)
                         if self.smooth_menu_open {
                             let flyout_x = self.toolbar.rect.x + self.toolbar.rect.w as i32 + 10;
                             let mut smooth_y = self.toolbar.rect.y;
@@ -416,9 +429,42 @@ impl PointerHandler for AppState {
                             }
                         }
 
+                        if self.thickness_menu_open {
+                            let flyout_x = self.toolbar.rect.x + self.toolbar.rect.w as i32 + 10;
+                            let mut thickness_y = self.toolbar.rect.y;
+                            for b in &self.toolbar.buttons {
+                                if b.icon == Tool::Thickness {
+                                    thickness_y = b.rect.y;
+                                    break;
+                                }
+                            }
+
+                            let flyout_rect = Rect {
+                                x: flyout_x,
+                                y: thickness_y,
+                                w: 160, // 4 levels * 40px
+                                h: 40,
+                            };
+
+                            if flyout_rect.contains(current_point.x, current_point.y) {
+                                let local_x = current_point.x - flyout_x as f32;
+                                let idx = (local_x / 40.0).floor() as usize;
+                                let values = [2.0, 4.0, 8.0, 16.0];
+                                self.thickness = values[idx.min(3)];
+                                self.last_non_zero_thickness = self.thickness;
+                                self.thickness_menu_open = false;
+                                self.mark_toolbar_dirty();
+                                if !self.frame_pending {
+                                    self.draw(qh);
+                                }
+                                return;
+                            }
+                        }
+
                         // 2. Check if we clicked on the toolbar
                         let mut ui_clicked = false;
                         let mut smooth_button_clicked = false;
+                        let mut thickness_button_clicked = false;
                         for btn in &self.toolbar.buttons {
                             if btn.rect.contains(current_point.x, current_point.y) {
                                 ui_clicked = true;
@@ -426,6 +472,8 @@ impl PointerHandler for AppState {
                                     if button == 272 { self.undo(); }
                                 } else if btn.icon == Tool::Smooth {
                                     smooth_button_clicked = true;
+                                } else if btn.icon == Tool::Thickness {
+                                    thickness_button_clicked = true;
                                 } else if self.current_tool != btn.icon {
                                     if button == 272 { self.current_tool = btn.icon; }
                                 }
@@ -437,6 +485,7 @@ impl PointerHandler for AppState {
                             if button == 273 {
                                 // Right click toggles menu
                                 self.smooth_menu_open = !self.smooth_menu_open;
+                                self.thickness_menu_open = false;
                             } else {
                                 // Left click toggles on/off
                                 if self.smoothness > 0 {
@@ -445,6 +494,28 @@ impl PointerHandler for AppState {
                                 } else {
                                     self.smoothness = self.last_non_zero_smoothness;
                                 }
+                                self.smooth_menu_open = false;
+                                self.thickness_menu_open = false;
+                            }
+                            self.mark_toolbar_dirty();
+                            if !self.frame_pending {
+                                self.draw(qh);
+                            }
+                            return;
+                        }
+
+                        if thickness_button_clicked {
+                            if button == 273 {
+                                // Right click toggles menu
+                                self.thickness_menu_open = !self.thickness_menu_open;
+                                self.smooth_menu_open = false;
+                            } else {
+                                // Left click cycles thickness
+                                let values = [2.0, 4.0, 8.0, 16.0];
+                                let current_idx = values.iter().position(|&v| (v - self.thickness).abs() < 0.1).unwrap_or(1);
+                                self.thickness = values[(current_idx + 1) % values.len()];
+                                self.last_non_zero_thickness = self.thickness;
+                                self.thickness_menu_open = false;
                                 self.smooth_menu_open = false;
                             }
                             self.mark_toolbar_dirty();
@@ -457,6 +528,7 @@ impl PointerHandler for AppState {
                         if ui_clicked {
                             if button == 272 {
                                 self.smooth_menu_open = false;
+                                self.thickness_menu_open = false;
                                 self.mark_toolbar_dirty();
                                 if !self.frame_pending {
                                     self.draw(qh);
@@ -466,8 +538,9 @@ impl PointerHandler for AppState {
                         }
 
                         // If menu was open but we clicked elsewhere, close it and continue (might start drawing)
-                        if self.smooth_menu_open {
+                        if self.smooth_menu_open || self.thickness_menu_open {
                             self.smooth_menu_open = false;
+                            self.thickness_menu_open = false;
                             self.mark_toolbar_dirty();
                             // Don't return, we might want to start drawing a stroke
                         }
@@ -479,22 +552,23 @@ impl PointerHandler for AppState {
                                     start: current_point.clone(),
                                     end: current_point,
                                     color: tiny_skia::Color::from_rgba8(255, 0, 0, 255),
-                                    thickness: 4.0,
+                                    thickness: self.thickness,
                                 },
                                 Tool::Arrow => Shape::Arrow {
                                     start: current_point.clone(),
                                     end: current_point,
                                     color: tiny_skia::Color::from_rgba8(255, 0, 0, 255),
-                                    thickness: 4.0,
+                                    thickness: self.thickness,
                                 },
                                 Tool::Freehand => Shape::Freehand {
                                     points: vec![current_point],
                                     color: tiny_skia::Color::from_rgba8(255, 0, 0, 255),
-                                    thickness: 4.0,
+                                    thickness: self.thickness,
                                     smoothness: self.smoothness,
                                 },
                                 Tool::Undo => unreachable!("Undo is an action, not a drawable tool"),
                                 Tool::Smooth => unreachable!("Smooth is a toggle action"),
+                                Tool::Thickness => unreachable!("Thickness is a toggle action"),
                             };
                             self.active_shape = Some(shape);
                             needs_redraw = true;
@@ -541,7 +615,7 @@ impl AppState {
         let mut area = self.toolbar.rect.clone();
         // Always include the flyout area in damage calculations to ensure it is cleared
         // even if it just closed this frame.
-        area.w += 130; // 120px flyout + 10px gap
+        area.w += 170; // Max flyout width + gap
         
         self.pending_damage = match &self.pending_damage {
             Some(d) => Some(d.union(&area)),
@@ -611,8 +685,8 @@ impl AppState {
         // For simplicity, let's just union the toolbar rect with dirty rect if anything changed
         if dirty_rect.is_some() {
             let mut ui_area = self.toolbar.rect.clone();
-            if self.smooth_menu_open {
-                ui_area.w += 160;
+            if self.smooth_menu_open || self.thickness_menu_open {
+                ui_area.w += 170;
             }
             dirty_rect = match dirty_rect {
                 Some(d) => Some(d.union(&ui_area)),
@@ -664,6 +738,8 @@ impl AppState {
                     self.current_tool,
                     self.smoothness,
                     self.smooth_menu_open,
+                    self.thickness,
+                    self.thickness_menu_open,
                 );
             }
 

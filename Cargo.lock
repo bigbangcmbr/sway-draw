@@ -781,6 +781,7 @@ dependencies = [
  "smithay-client-toolkit",
  "tiny-skia",
  "wayland-client",
+ "wayland-protocols",
  "wayland-protocols-wlr",
 ]
 
