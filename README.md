@@ -36,18 +36,19 @@ cargo run --release
 - **Launch**: Bind `sway-draw` to a key in your compositor config for instant access.
 - **Draw**: Left click and drag to draw.
 - **Tools**:
-    - `Ctrl + 1`: Freehand Tool 🖋️
-    - `Ctrl + 2`: Rectangle Tool ⬛
-    - `Ctrl + 3`: Line & Arrow Tool ↗️ (Right-click button to toggle)
+  - `Ctrl + 1`: Freehand Tool
+  - `Ctrl + 2`: Rectangle Tool
+  - `Ctrl + 3`: Line & Arrow Tool (Right-click button to toggle)
 - **Actions**:
-    - `Ctrl + 4`: Toggle Smoothing 🌊
-    - `Ctrl + Z`: Undo last stroke 🔙
-    - `Ctrl + D`: Clear Screen 🗑️
-    - `Esc`: Exit and clear all annotations ❌
+  - `Ctrl + 4`: Toggle Smoothing
+  - `Ctrl + Z`: Undo last stroke
+  - `Ctrl + D`: Clear Screen
+  - `Esc`: Exit and clear all annotations
 
 ## 🏗️ Architecture
 
 For more details on the internal design, rendering engine, and module structure, please see [Architecture.md](./Architecture.md).
 
 ---
+
 Built with ❤️ for the Wayland ecosystem.
