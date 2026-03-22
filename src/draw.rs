@@ -98,22 +98,6 @@ pub fn render_toolbar(
 
         resvg::render(&button.svg_tree, ts, pixmap);
 
-        // Show dots for Smooth levels (1 dot for Low, 2 dots for High)
-        if button.icon == Tool::Smooth && smoothness > 0 {
-            let mut dot_paint = tiny_skia::Paint::default();
-            dot_paint.set_color(tiny_skia::Color::WHITE);
-            for i in 0..smoothness {
-                let dot_rect = tiny_skia::Rect::from_xywh(
-                    button.rect.x as f32 + 2.0,
-                    button.rect.y as f32 + button.rect.h as f32 - 4.0 - (i as f32 * 4.0),
-                    2.0,
-                    2.0,
-                )
-                .unwrap();
-                pixmap.fill_rect(dot_rect, &dot_paint, tiny_skia::Transform::identity(), None);
-            }
-        }
-
         // Render Flyout
         if button.icon == Tool::Smooth && smooth_menu_open {
             let flyout_x = toolbar.rect.x as f32 + toolbar.rect.w as f32 + 10.0;
@@ -142,11 +126,12 @@ pub fn render_toolbar(
                 let level_rect = tiny_skia::Rect::from_xywh(level_x + 2.0, flyout_y + 2.0, 36.0, 36.0).unwrap();
                 pixmap.fill_rect(level_rect, &level_paint, tiny_skia::Transform::identity(), None);
 
-                // Render level SVG icon
+                // Render level SVG icon centered in the 36x36 button
                 if let Some(tree) = toolbar.smooth_level_icons.get(level as usize) {
-                    // Scale to fit 20px icon in 36px button with padding
-                    let scale = 20.0 / 24.0;
-                    let ts = tiny_skia::Transform::from_translate(level_x + 8.0, flyout_y + 8.0)
+                    let target_size = 24.0;
+                    let scale = target_size / 24.0;
+                    let offset = (36.0 - target_size) / 2.0;
+                    let ts = tiny_skia::Transform::from_translate(level_x + 2.0 + offset, flyout_y + 2.0 + offset)
                         .pre_scale(scale, scale);
                     
                     resvg::render(tree, ts, pixmap);
