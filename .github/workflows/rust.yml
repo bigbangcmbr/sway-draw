@@ -14,7 +14,7 @@ jobs:
       matrix:
         include:
           - target: x86_64-unknown-linux-gnu
-            asset_name: mytool-linux-x86_64
+            asset_name: sway-draw-linux-x86_64
           # Note: Static MUSL builds with Wayland/X11 dependencies are complex.
           # Stick to GNU for now as it matches Fedora's environment.
 
@@ -43,8 +43,8 @@ jobs:
     - name: Prepare Release Assets
       run: |
         mkdir -p dist
-        # Replace 'mytool' with your actual binary name from Cargo.toml
-        cp target/${{ matrix.target }}/release/mytool dist/
+        # Copy the actual binary name from Cargo.toml
+        cp target/${{ matrix.target }}/release/sway-draw dist/
         cp README.md LICENSE dist/ || true
         tar -czf ${{ matrix.asset_name }}.tar.gz -C dist .
 
