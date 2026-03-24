@@ -9,7 +9,7 @@
 - **Surface Boundary**: Use the `wlr-layer-shell` protocol. It allows the surface to be pinned as an `overlay` layer (above all standard windows and panels) and bypass normal Sway tiling rules.
 - **Buffer Management**: `wl_shm` (Shared Memory) will be used to allocate memory that both the app and the Sway compositor can read/write to.
 - **Cursor Management**: Uses the `wp-cursor-shape-v1` protocol to set a native arrow cursor, ensuring the utility feels like a standard system tool rather than a transparent "dead zone."
-- **Multimonitor Handling**: Must listen to `wl_output` events to span correctly across single or multiple monitors (typically by spawning a separate layer-shell surface for each output).
+- **Multimonitor Handling (Planned)**: The current version supports the primary monitor. Future updates will listen to `wl_output` events to span correctly across multiple monitors by spawning a separate layer-shell surface for each output.
 
 ## Input Handling
 - Listen purely to standard Wayland `wl_pointer` and `wl_keyboard` events.
@@ -17,8 +17,11 @@
 - **UI Interaction**: Manually hit-test pointer events against `Rect` primitives to handle toolbar buttons, toggle-actions, and flyout menus.
 - **Keyboard Events**: Capture specific keybinds natively:
     - `Esc`: Quit application.
-    - `Ctrl+1/2/3`: Switch between Freehand, Rectangle, and Line/Arrow tools.
-    - `Ctrl+4`: Toggle Smoothing.
+    - `Ctrl+1`: Laser Pen Tool (Fading).
+    - `Ctrl+2`: Freehand Tool.
+    - `Ctrl+3`: Rectangle Tool.
+    - `Ctrl+4`: Line & Arrow Tool.
+    - `Ctrl+5`: Toggle Smoothing.
     - `Ctrl+Z`: Undo last stroke.
     - `Ctrl+D`: Clear screen.
 
@@ -41,11 +44,7 @@
 - `src/main.rs`: Execution entry point containing the Wayland connection, registry startup logic, and event loop.
 - `src/state.rs`: Holds the massive `AppState` structure, manages damage rectangles alongside `completed_canvas`, handles compositor rendering (`.draw()`), and delegates all native Wayland event interactions via smithay protocol handlers.
 - `src/draw.rs`: Dedicated module containing pure algorithmic drawing subroutines interfacing with `tiny-skia` (e.g., parsing path builders for `Stroke` rendering).
-- `src/types.rs`: Mathematical and state primitives: coordinates (`Point`), color structures (`Stroke`), and geometry bounding tools (`Rect`).
-
-## State Management
-- **Vector-based Data Model**: Store drawings as mathematical data (e.g., coordinates, thickness, color), not raw pixel bitmaps.
-- **Undo/Redo Stack**: Keep track of user actions (strokes) in an array to easily pop the last drawn element.
+- `src/types.rs`: Mathematical and state primitives: coordinates (`Point`), color structures (`Shape`), and geometry definitions for the `Toolbar` and UI.
 
 ## Application Lifecycle
 - **One-Shot Execution**: Launched via a Sway `$mod` keybind. Runs until the user resolves the annotation (e.g., presses `Escape` or copies the screen), at which point it clears the Wayland surfaces and destructs completely.
