@@ -89,8 +89,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         line_menu_open: false,
         active_shape: None,
         completed_shapes: Vec::new(),
+        active_lasers: Vec::new(),
         completed_canvas: tiny_skia::Pixmap::new(1920, 1080).unwrap(),
         last_active_stroke_rect: None,
+        last_lasers_rect: None,
         pending_damage: Some(Rect {
             x: 0,
             y: 0,

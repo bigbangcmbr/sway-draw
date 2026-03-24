@@ -276,8 +276,93 @@ pub fn render_toolbar(
 }
 
 pub fn render_shape(pixmap: &mut tiny_skia::PixmapMut, shape: &Shape) {
+    if let Shape::LaserLine {
+        points,
+        _color: _,
+        thickness,
+    } = shape
+    {
+        if points.len() < 2 {
+            return;
+        }
+
+        // Apply smoothing to the laser path to avoid "low poly" look
+        let pts: Vec<Point> = points.iter().map(|(p, _)| p.clone()).collect();
+        let smoothed = if pts.len() >= 3 {
+            smooth_points(&pts, 1) // Use low-level smoothing for responsiveness
+        } else {
+            pts
+        };
+
+        let mut pb = tiny_skia::PathBuilder::new();
+        pb.move_to(smoothed[0].x, smoothed[0].y);
+        if smoothed.len() >= 3 {
+            for i in 1..smoothed.len() - 1 {
+                let p1 = &smoothed[i];
+                let p2 = &smoothed[i + 1];
+                let mid_x = (p1.x + p2.x) / 2.0;
+                let mid_y = (p1.y + p2.y) / 2.0;
+                pb.quad_to(p1.x, p1.y, mid_x, mid_y);
+            }
+            let last = &smoothed[smoothed.len() - 1];
+            pb.line_to(last.x, last.y);
+        } else {
+            for p in &smoothed[1..] {
+                pb.line_to(p.x, p.y);
+            }
+        }
+
+        if let Some(path) = pb.finish() {
+            let mut paint = tiny_skia::Paint::default();
+            paint.anti_alias = true;
+
+            // Multi-layered high-definition glow
+            let glow_steps = 15;
+            for i in 0..glow_steps {
+                let progress = i as f32 / (glow_steps - 1) as f32; // 0 (outer) to 1 (inner)
+                let width_factor = 4.0 - (progress * 3.5); // 4.0x down to 0.5x
+
+                // Alpha curve: exponential falloff for soft edges, solid core
+                let alpha = if progress < 0.5 {
+                    (progress / 0.5).powf(2.0) * 0.4 // Faint outer halo
+                } else {
+                    0.4 + ((progress - 0.5) / 0.5).powf(1.5) * 0.6 // Quickly becoming solid
+                };
+
+                // Color interpolation:
+                // Outer -> Middle: Saturated Red (1.0, 0.0, 0.0)
+                // Core: Whitish Red (1.0, 0.9, 0.9)
+                let r = 1.0;
+                let mut g = 0.0;
+                let mut b = 0.0;
+
+                if progress > 0.8 {
+                    let core_mix = (progress - 0.8) / 0.2;
+                    g = core_mix * 0.9;
+                    b = core_mix * 0.9;
+                }
+
+                paint.set_color(tiny_skia::Color::from_rgba(r, g, b, alpha).unwrap());
+                pixmap.stroke_path(
+                    &path,
+                    &paint,
+                    &tiny_skia::Stroke {
+                        width: *thickness * width_factor,
+                        line_cap: tiny_skia::LineCap::Round,
+                        line_join: tiny_skia::LineJoin::Round,
+                        ..Default::default()
+                    },
+                    tiny_skia::Transform::identity(),
+                    None,
+                );
+            }
+        }
+        return;
+    }
+
     let mut pb = tiny_skia::PathBuilder::new();
     let (color, thickness) = match shape {
+        Shape::LaserLine { .. } => unreachable!("Handled above"),
         Shape::Freehand {
             points,
             color,

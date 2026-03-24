@@ -55,9 +55,11 @@ pub struct AppState {
     pub line_menu_open: bool,
     pub active_shape: Option<Shape>,
     pub completed_shapes: Vec<Shape>,
+    pub active_lasers: Vec<Shape>,
 
     pub completed_canvas: tiny_skia::Pixmap,
     pub last_active_stroke_rect: Option<Rect>,
+    pub last_lasers_rect: Option<Rect>,
     pub pending_damage: Option<Rect>,
     pub needs_redraw: bool,
     pub frame_pending: bool,
@@ -90,6 +92,43 @@ impl CompositorHandler for AppState {
         _time: u32,
     ) {
         self.frame_pending = false;
+
+        let now = std::time::Instant::now();
+        let fade_duration = std::time::Duration::from_millis(1500);
+        let mut lasers_changed = false;
+
+        // Prune active lasers
+        for shape in self.active_lasers.iter_mut() {
+            if let Shape::LaserLine { points, .. } = shape {
+                let orig_len = points.len();
+                points.retain(|(_, time)| now.duration_since(*time) < fade_duration);
+                if points.len() != orig_len {
+                    lasers_changed = true;
+                }
+            }
+        }
+        let orig_len = self.active_lasers.len();
+        self.active_lasers.retain(|shape| match shape {
+            Shape::LaserLine { points, .. } => !points.is_empty(),
+            _ => true,
+        });
+        if self.active_lasers.len() != orig_len {
+            lasers_changed = true;
+        }
+
+        // Prune active shape if it's a laser
+        if let Some(Shape::LaserLine { points, .. }) = &mut self.active_shape {
+            let orig_len = points.len();
+            points.retain(|(_, time)| now.duration_since(*time) < fade_duration);
+            if points.len() != orig_len {
+                lasers_changed = true;
+            }
+        }
+
+        if lasers_changed || !self.active_lasers.is_empty() || matches!(self.active_shape, Some(Shape::LaserLine { .. })) {
+            self.needs_redraw = true;
+        }
+
         if self.needs_redraw {
             self.draw(qh);
         }
@@ -269,15 +308,14 @@ impl KeyboardHandler for AppState {
         if event.keysym == Keysym::Escape {
             self.exit = true;
         } else if is_ctrl && event.keysym == Keysym::_1 {
-            self.current_tool = Tool::Freehand;
-            self.mark_toolbar_dirty();
+            self.set_tool(Tool::Laser);
         } else if is_ctrl && event.keysym == Keysym::_2 {
-            self.current_tool = Tool::Rectangle;
-            self.mark_toolbar_dirty();
+            self.set_tool(Tool::Freehand);
         } else if is_ctrl && event.keysym == Keysym::_3 {
-            self.current_tool = Tool::Line;
-            self.mark_toolbar_dirty();
+            self.set_tool(Tool::Rectangle);
         } else if is_ctrl && event.keysym == Keysym::_4 {
+            self.set_tool(Tool::Line);
+        } else if is_ctrl && event.keysym == Keysym::_5 {
             if self.smoothness > 0 {
                 self.last_non_zero_smoothness = self.smoothness;
                 self.smoothness = 0;
@@ -379,6 +417,9 @@ impl PointerHandler for AppState {
                             y: event.position.1 as f32,
                         };
                         match shape {
+                            Shape::LaserLine { points, .. } => {
+                                points.push((current_point, std::time::Instant::now()));
+                            }
                             Shape::Freehand { points, .. } => {
                                 points.push(current_point);
                             }
@@ -513,10 +554,9 @@ impl PointerHandler for AppState {
                                     thickness_button_clicked = true;
                                 } else if btn.icon == Tool::Line {
                                     line_button_clicked = true;
-                                    if button == 272 || button == 273 { self.current_tool = Tool::Line; }
-                                }
- else if self.current_tool != btn.icon {
-                                    if button == 272 { self.current_tool = btn.icon; }
+                                    if button == 272 || button == 273 { self.set_tool(Tool::Line); }
+                                } else if button == 272 {
+                                    self.set_tool(btn.icon);
                                 }
                                 break;
                             }
@@ -606,6 +646,11 @@ impl PointerHandler for AppState {
                         if !self.toolbar.rect.contains(current_point.x, current_point.y) {
                             // Only start drawing if NOT on toolbar
                             let shape = match self.current_tool {
+                                Tool::Laser => Shape::LaserLine {
+                                    points: vec![(current_point, std::time::Instant::now())],
+                                    _color: tiny_skia::Color::from_rgba8(255, 0, 0, 255), // Pure red base
+                                    thickness: self.thickness * 0.8, // Thinner base for precision
+                                },
                                 Tool::Rectangle => Shape::Rectangle {
                                     start: current_point.clone(),
                                     end: current_point,
@@ -639,9 +684,13 @@ impl PointerHandler for AppState {
                     if button == 272 {
                         if let Some(shape) = self.active_shape.take() {
                             if let Some(bounds) = shape.bounding_box() {
-                                // Bake into completed canvas
-                                render_shape(&mut self.completed_canvas.as_mut(), &shape);
-                                self.completed_shapes.push(shape);
+                                if let Shape::LaserLine { .. } = &shape {
+                                    self.active_lasers.push(shape);
+                                } else {
+                                    // Bake into completed canvas
+                                    render_shape(&mut self.completed_canvas.as_mut(), &shape);
+                                    self.completed_shapes.push(shape);
+                                }
                                 self.pending_damage = match &self.pending_damage {
                                     Some(d) => Some(d.union(&bounds)),
                                     None => Some(bounds),
@@ -671,6 +720,14 @@ impl ShmHandler for AppState {
 }
 
 impl AppState {
+    pub fn set_tool(&mut self, tool: Tool) {
+        if self.current_tool != tool {
+            log::info!("Active tool changed: {:?}", tool);
+            self.current_tool = tool;
+            self.mark_toolbar_dirty();
+        }
+    }
+
     pub fn mark_toolbar_dirty(&mut self) {
         let mut area = self.toolbar.rect.clone();
         // Always include the flyout area in damage calculations to ensure it is cleared
@@ -745,9 +802,34 @@ impl AppState {
             };
         }
 
+        // Add last frame's active lasers area so we erase them
+        if let Some(r) = &self.last_lasers_rect {
+            dirty_rect = match dirty_rect {
+                Some(d) => Some(d.union(r)),
+                None => Some(r.clone()),
+            };
+        }
+
         // Add current frame's active stroke
         let current_active_rect = self.active_shape.as_ref().and_then(|s| s.bounding_box());
         if let Some(r) = &current_active_rect {
+            dirty_rect = match dirty_rect {
+                Some(d) => Some(d.union(r)),
+                None => Some(r.clone()),
+            };
+        }
+
+        // Add current frame's active lasers
+        let mut current_lasers_rect: Option<Rect> = None;
+        for laser in &self.active_lasers {
+            if let Some(r) = laser.bounding_box() {
+                current_lasers_rect = match current_lasers_rect {
+                    Some(d) => Some(d.union(&r)),
+                    None => Some(r),
+                };
+            }
+        }
+        if let Some(r) = &current_lasers_rect {
             dirty_rect = match dirty_rect {
                 Some(d) => Some(d.union(r)),
                 None => Some(r.clone()),
@@ -768,6 +850,7 @@ impl AppState {
         }
 
         self.last_active_stroke_rect = current_active_rect;
+        self.last_lasers_rect = current_lasers_rect;
 
         // If nothing needs to be redrawn, we just attach buffer and commit (or we could even skip committing entirely,
         // but smithay might expect a frame callback response. Safe bet is to draw nothing and commit).
@@ -799,6 +882,11 @@ impl AppState {
 
             {
                 let mut pixmap = tiny_skia::PixmapMut::from_bytes(canvas, width, height).unwrap();
+                // Render fading lasers
+                for laser in &self.active_lasers {
+                    render_shape(&mut pixmap, laser);
+                }
+
                 // 3. Render the active stroke on top (it inherently clips if handled correctly by skia, or it falls within dirty bounds)
                 if let Some(active) = &self.active_shape {
                     render_shape(&mut pixmap, active);

@@ -30,12 +30,13 @@
   3. When a user interacts, calculate the geometry (lines, rectangles, smoothed Bézier curves) and instruct the rendering library to rasterize those shapes into the buffer.
   4. Submit (commit) the modified buffer to Sway for integration on the screen.
 - **Toolbar & Flyouts**: The UI is rendered manually into the same buffer. Supports interactive flyout menus for advanced settings (Smoothing levels, Line Thickness) and visual separators to group tool types.
-- **Damage Tracking (Performance)**: Instead of redrawing the full 4K screen on every frame, the application calculates a precise `dirty_rect` combining the bounding boxes of new strokes, the active ongoing stroke, and any UI changes (like opening a flyout). It persists committed strokes into a `completed_canvas` buffer in standard memory, and copies over only the bounds of the `dirty_rect` into the Wayland canvas to submit minimal `damage_buffer()` requests.
+- **Damage Tracking (Performance)**: Instead of redrawing the full 4K screen on every frame, the application calculates a precise `dirty_rect` combining the bounding boxes of new strokes, active ongoing strokes, fading laser trails, and any UI changes (like opening a flyout). It persists committed strokes into a `completed_canvas` buffer in standard memory, and copies over only the bounds of the `dirty_rect` into the Wayland canvas to submit minimal `damage_buffer()` requests. Continuous animation (e.g. fading lasers) continuously drives this minimal redraw cycle.
 
 ## State Management
 - **Vector-based Data Model**: Store drawings as mathematical data (e.g., coordinates, thickness, color, smoothing level), not raw pixel bitmaps.
 - **Undo/Clear**: Supports popping the last shape from the stack for Undo, or purging the entire stack for a full Clear action.
 - **Smoothing Algorithm**: Employs a multi-pass Laplacian smoothing filter followed by Quadratic Bézier conversion for "ink-like" freehand drawing.
+- **Laser Pen (Fading)**: Fading trails are managed outside the core persistence model. Laser lines decay point-by-point based on age, continuously updating bounding boxes and triggering animation loop redraws until fully faded. They are ignored by `completed_canvas` to preserve transience.
 
 - `src/main.rs`: Execution entry point containing the Wayland connection, registry startup logic, and event loop.
 - `src/state.rs`: Holds the massive `AppState` structure, manages damage rectangles alongside `completed_canvas`, handles compositor rendering (`.draw()`), and delegates all native Wayland event interactions via smithay protocol handlers.

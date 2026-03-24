@@ -51,10 +51,11 @@ Freehand curves use a multi-pass Laplacian smoothing filter combined with Quadra
 - **Debug**: Use `RUST_LOG=debug cargo run` to see protocol and input logs.
 
 ### Tool Control Shortcuts
-- **Freehand**: `Ctrl+1`
-- **Rectangle**: `Ctrl+2`
-- **Line/Arrow**: `Ctrl+3` (Right-click button to toggle mode)
-- **Toggle Smoothing**: `Ctrl+4` (Toggles between Off and Last Active Level).
+- **Laser**: `Ctrl+1`
+- **Freehand**: `Ctrl+2`
+- **Rectangle**: `Ctrl+3`
+- **Line/Arrow**: `Ctrl+4` (Right-click button to toggle mode)
+- **Toggle Smoothing**: `Ctrl+5` (Toggles between Off and Last Active Level).
 - **Undo**: `Ctrl+Z`
 
 ### UI Interaction

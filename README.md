@@ -36,11 +36,12 @@ cargo run --release
 - **Launch**: Bind `sway-draw` to a key in your compositor config for instant access.
 - **Draw**: Left click and drag to draw.
 - **Tools**:
-  - `Ctrl + 1`: Freehand Tool
-  - `Ctrl + 2`: Rectangle Tool
-  - `Ctrl + 3`: Line & Arrow Tool (Right-click button to toggle)
+  - `Ctrl + 1`: Laser Pen Tool (Fading)
+  - `Ctrl + 2`: Freehand Tool
+  - `Ctrl + 3`: Rectangle Tool
+  - `Ctrl + 4`: Line & Arrow Tool (Right-click button to toggle)
 - **Actions**:
-  - `Ctrl + 4`: Toggle Smoothing
+  - `Ctrl + 5`: Toggle Smoothing
   - `Ctrl + Z`: Undo last stroke
   - `Ctrl + D`: Clear Screen
   - `Esc`: Exit and clear all annotations

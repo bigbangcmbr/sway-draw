@@ -1,5 +1,6 @@
 use resvg::usvg;
 
+const SVG_LASER: &str = r#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="M5 5l1.5 1.5"/><path d="M17.5 17.5L19 19"/><path d="M19 5l-1.5 1.5"/><path d="M5 19l1.5-1.5"/></svg>"#;
 const SVG_FREEHAND: &str = r#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/><path d="M2 2l8 8"/><path d="M2 22l5-5"/></svg>"#;
 const SVG_RECTANGLE: &str = r#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/></svg>"#;
 const SVG_LINE: &str = r#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/></svg>"#;
@@ -20,6 +21,7 @@ const SVG_THICKNESS_4: &str = r#"<svg xmlns="http://www.w3.org/2000/svg" viewBox
 
 fn get_tool_svg(tool: Tool) -> &'static str {
     match tool {
+        Tool::Laser => SVG_LASER,
         Tool::Freehand => SVG_FREEHAND,
         Tool::Rectangle => SVG_RECTANGLE,
         Tool::Line => SVG_LINE,
@@ -91,6 +93,7 @@ pub enum Tool {
     Rectangle,
     Line,
     Freehand,
+    Laser,
     Smooth,
     Thickness,
     Clear,
@@ -99,6 +102,11 @@ pub enum Tool {
 
 #[derive(Clone, Debug)]
 pub enum Shape {
+    LaserLine {
+        points: Vec<(Point, std::time::Instant)>,
+        _color: tiny_skia::Color,
+        thickness: f32,
+    },
     Freehand {
         points: Vec<Point>,
         color: tiny_skia::Color,
@@ -123,6 +131,25 @@ pub enum Shape {
 impl Shape {
     pub fn bounding_box(&self) -> Option<Rect> {
         let (mut min_x, mut min_y, mut max_x, mut max_y, thickness) = match self {
+            Shape::LaserLine {
+                points, thickness, ..
+            } => {
+                if points.is_empty() {
+                    return None;
+                }
+                let mut min_x = points[0].0.x;
+                let mut min_y = points[0].0.y;
+                let mut max_x = points[0].0.x;
+                let mut max_y = points[0].0.y;
+
+                for (p, _) in &points[1..] {
+                    min_x = min_x.min(p.x);
+                    min_y = min_y.min(p.y);
+                    max_x = max_x.max(p.x);
+                    max_y = max_y.max(p.y);
+                }
+                (min_x, min_y, max_x, max_y, *thickness)
+            }
             Shape::Freehand {
                 points, thickness, ..
             } => {
@@ -168,6 +195,7 @@ impl Shape {
         // For Arrow/Line with arrow, pad a bit more to account for arrowhead which can extend slightly beyond bounds
         let pad = match self {
             Shape::Line { thickness, has_arrow: true, .. } => pad + (*thickness * 3.0),
+            Shape::LaserLine { thickness, .. } => pad + (*thickness * 1.5) + 1.0, // Laser has a 4x thickness max bloom
             _ => pad,
         };
 
@@ -205,10 +233,11 @@ impl Toolbar {
         let button_size = 40;
         let padding = 10;
         let x = 20; // Positioned 20px from left
-        let y = (screen_height as i32 - (7 * (button_size + padding))) / 2; // Centered vertically, 7 buttons now
+        let y = (screen_height as i32 - (8 * (button_size + padding))) / 2; // Centered vertically, 8 buttons now
 
         let mut buttons = Vec::new();
         let tools = [
+            Tool::Laser,
             Tool::Freehand,
             Tool::Rectangle,
             Tool::Line,
@@ -228,8 +257,8 @@ impl Toolbar {
             // Add extra space after the third tool (Line) and fifth tool (Thickness) for separators
             // Current padding is 10px. Adding 10px more creates a 20px total gap.
             let mut extra_y = 0;
-            if i >= 3 { extra_y += 10; }
-            if i >= 5 { extra_y += 10; }
+            if i >= 4 { extra_y += 10; }
+            if i >= 6 { extra_y += 10; }
 
             buttons.push(Button {
                 rect: Rect {
@@ -272,3 +301,31 @@ impl Toolbar {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_laser_line_bounding_box() {
+        let now = std::time::Instant::now();
+        let shape = Shape::LaserLine {
+            points: vec![
+                (Point { x: 10.0, y: 10.0 }, now),
+                (Point { x: 20.0, y: 20.0 }, now),
+            ],
+            _color: tiny_skia::Color::from_rgba8(255, 0, 0, 255),
+            thickness: 2.0,
+        };
+        let bb = shape.bounding_box().unwrap();
+        // min_x=10, min_y=10, max_x=20, max_y=20, pad = (2/2 + 2) + (1.5*2 + 1) = 7
+        // So x = 10 - 7 = 3, y = 10 - 7 = 3
+        // w = (20 + 7) - 3 = 24
+        // h = (20 + 7) - 3 = 24
+        assert_eq!(bb.x, 3);
+        assert_eq!(bb.y, 3);
+        assert_eq!(bb.w, 24);
+        assert_eq!(bb.h, 24);
+    }
+}
+
