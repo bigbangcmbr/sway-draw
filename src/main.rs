@@ -45,7 +45,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let compositor = CompositorState::bind(&globals, &qh).expect("wl_compositor is not available");
     let layer_shell = LayerShell::bind(&globals, &qh).expect("layer shell is not available");
     let shm = Shm::bind(&globals, &qh).expect("wl_shm is not available");
-    let cursor_shape_manager = smithay_client_toolkit::seat::pointer::cursor_shape::CursorShapeManager::bind(&globals, &qh).ok();
+    let cursor_shape_manager =
+        smithay_client_toolkit::seat::pointer::cursor_shape::CursorShapeManager::bind(
+            &globals, &qh,
+        )
+        .ok();
 
     let surface = compositor.create_surface(&qh);
     let layer =
@@ -78,7 +82,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         pointer: None,
 
         toolbar: types::Toolbar::new(1920, 1080),
-        current_tool: types::Tool::Freehand,
+        current_tool: types::Tool::Laser,
         smoothness: 1,
         last_non_zero_smoothness: 1,
         smooth_menu_open: false,
