@@ -60,10 +60,10 @@ pub fn render_toolbar(
     let mut sep_paint = tiny_skia::Paint::default();
     sep_paint.set_color(tiny_skia::Color::from_rgba8(80, 84, 92, 255));
 
-    // Separator after Line (3rd tool)
-    if toolbar.buttons.len() >= 4 {
-        let b3 = &toolbar.buttons[2];
-        let sep_y = b3.rect.y + b3.rect.h as i32 + 10;
+    // Separator after Line (4th tool)
+    if toolbar.buttons.len() >= 5 {
+        let b4 = &toolbar.buttons[3];
+        let sep_y = b4.rect.y + b4.rect.h as i32 + 10;
         let sep_rect = tiny_skia::Rect::from_xywh(
             toolbar.rect.x as f32 + 10.0,
             sep_y as f32,
@@ -74,10 +74,10 @@ pub fn render_toolbar(
         pixmap.fill_rect(sep_rect, &sep_paint, tiny_skia::Transform::identity(), None);
     }
 
-    // Separator after Thickness (5th tool)
-    if toolbar.buttons.len() >= 6 {
-        let b5 = &toolbar.buttons[4];
-        let sep_y = b5.rect.y + b5.rect.h as i32 + 10;
+    // Separator after Thickness (6th tool)
+    if toolbar.buttons.len() >= 7 {
+        let b6 = &toolbar.buttons[5];
+        let sep_y = b6.rect.y + b6.rect.h as i32 + 10;
         let sep_rect = tiny_skia::Rect::from_xywh(
             toolbar.rect.x as f32 + 10.0,
             sep_y as f32,

@@ -254,7 +254,7 @@ impl Toolbar {
             let svg_str = get_tool_svg(*tool);
             let svg_tree = usvg::Tree::from_str(svg_str, &opt).unwrap();
 
-            // Add extra space after the third tool (Line) and fifth tool (Thickness) for separators
+            // Add extra space after the fourth tool (Line) and sixth tool (Thickness) for separators
             // Current padding is 10px. Adding 10px more creates a 20px total gap.
             let mut extra_y = 0;
             if i >= 4 { extra_y += 10; }

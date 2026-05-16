@@ -765,6 +765,7 @@ impl AppState {
 
     pub fn clear(&mut self) {
         self.completed_shapes.clear();
+        self.active_lasers.clear();
         self.completed_canvas.fill(tiny_skia::Color::TRANSPARENT);
         self.active_shape = None;
         self.pending_damage = Some(Rect {
